@@ -1,0 +1,24 @@
+{
+  "name": "dify-dsl-builder",
+  "version": "1.0.0",
+  "description": "TypeScript OOP library for manipulating Dify DSL YAML files",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "dify-dsl": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "run": "tsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}

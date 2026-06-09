@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.YAMLWriter = void 0;
 class YAMLWriter {
     lines = [];
-    _indent = 0;
+    _indent = 0; // used by node base
     _firstInListItem = false;
     get spaces() {
         return "  ".repeat(this._indent);
@@ -11,6 +11,8 @@ class YAMLWriter {
     parentSpaces() {
         return "  ".repeat(Math.max(0, this._indent - 1));
     }
+    incIndent() { this._indent++; return this; }
+    decIndent() { this._indent = Math.max(0, this._indent - 1); return this; }
     key(k) {
         if (this._firstInListItem) {
             this.lines.push(`${this.parentSpaces()}- ${k}:`);
@@ -24,7 +26,10 @@ class YAMLWriter {
     keyVal(k, v) {
         if (this._firstInListItem) {
             this._firstInListItem = false;
-            if (v === null || v === undefined) {
+            if (v === null) {
+                this.lines.push(`${this.parentSpaces()}- ${k}: null`);
+            }
+            else if (v === undefined) {
                 this.lines.push(`${this.parentSpaces()}- ${k}:`);
             }
             else {
@@ -32,16 +37,17 @@ class YAMLWriter {
             }
         }
         else {
-            if (v === null || v === undefined) {
+            if (v === null) {
+                this.lines.push(`${this.spaces}${k}: null`);
+            }
+            else if (v === undefined) {
                 this.lines.push(`${this.spaces}${k}:`);
             }
+            else if (typeof v === "string" && v === "") {
+                this.lines.push(`${this.spaces}${k}: ''`);
+            }
             else if (typeof v === "string") {
-                if (v === "") {
-                    this.lines.push(`${this.spaces}${k}: ''`);
-                }
-                else {
-                    this.lines.push(`${this.spaces}${k}: ${v}`);
-                }
+                this.lines.push(`${this.spaces}${k}: ${v}`);
             }
             else {
                 this.lines.push(`${this.spaces}${k}: ${v}`);
@@ -50,16 +56,20 @@ class YAMLWriter {
         return this;
     }
     keyQuoted(k, v) {
+        if (typeof v !== "string") {
+            return this.keyVal(k, v);
+        }
         if (this._firstInListItem) {
             this._firstInListItem = false;
             this.lines.push(`${this.parentSpaces()}- ${k}: "${this.escapeDoubleQuoted(v)}"`);
             return this;
         }
-        if (v.includes("\\") || v.includes('"') || v.includes("\n") || v.includes("\U")) {
-            this.lines.push(`${this.spaces}${k}: "${this.escapeDoubleQuoted(v)}"`);
+        if (v === "") {
+            this.lines.push(`${this.spaces}${k}: ''`);
+            return this;
         }
-        else if (this.needsQuoting(v)) {
-            this.lines.push(`${this.spaces}${k}: '${v}'`);
+        if (this.needsQuoting(v) || /^\d/.test(v) || v.length === 0) {
+            this.lines.push(`${this.spaces}${k}: "${this.escapeDoubleQuoted(v)}"`);
         }
         else {
             this.lines.push(`${this.spaces}${k}: ${v}`);
@@ -73,7 +83,8 @@ class YAMLWriter {
                 this.lines.push(`${this.parentSpaces()}- ${k}: ""`);
                 return this;
             }
-            this.lines.push(`${this.parentSpaces()}- ${k}: |-`);
+            const strip = v.endsWith("\n") ? "|" : "|-";
+            this.lines.push(`${this.parentSpaces()}- ${k}: ${strip}`);
             const lines = v.split("\n");
             for (const line of lines) {
                 this.lines.push(`${this.spaces}${line}`);
@@ -84,7 +95,8 @@ class YAMLWriter {
             this.lines.push(`${this.spaces}${k}: ""`);
             return this;
         }
-        this.lines.push(`${this.spaces}${k}: |-`);
+        const strip = v.endsWith("\n") ? "|" : "|-";
+        this.lines.push(`${this.spaces}${k}: ${strip}`);
         const lines = v.split("\n");
         for (const line of lines) {
             this.lines.push(`${this.spaces}  ${line}`);
@@ -92,13 +104,25 @@ class YAMLWriter {
         return this;
     }
     raw(line) {
-        this.lines.push(`${this.spaces}${line}`);
+        if (this._firstInListItem) {
+            this.lines.push(`${this.parentSpaces()}- ${line}`);
+            this._firstInListItem = false;
+        }
+        else {
+            this.lines.push(`${this.spaces}${line}`);
+        }
         return this;
     }
     indent(fn) {
         this._indent++;
         fn();
         this._indent--;
+        return this;
+    }
+    parentLevel(fn) {
+        this._indent--;
+        fn();
+        this._indent++;
         return this;
     }
     listItem(fn) {
@@ -121,6 +145,14 @@ class YAMLWriter {
         if (/^\d/.test(v) && v.length > 10)
             return true;
         if (/^(true|false|null|yes|no|on|off)$/i.test(v))
+            return true;
+        if (/[{}\[\],&*!|>'\"`]/.test(v))
+            return true;
+        if (/: |:$/.test(v))
+            return true;
+        if (v.startsWith("#") || /:\s*#/.test(v))
+            return true;
+        if (v.includes("{{") || v.includes("}}"))
             return true;
         return false;
     }

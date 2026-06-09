@@ -85,6 +85,8 @@ interface IterStartNodeData extends BaseNodeData {
     type: "iteration-start";
     isInIteration: boolean;
     iteration_id: string;
+    height?: number;
+    width?: number;
 }
 export declare class IterationStartNode extends BaseNode<IterStartNodeData> {
     parentId: string;

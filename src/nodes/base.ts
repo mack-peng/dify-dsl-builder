@@ -58,16 +58,19 @@ export abstract class BaseNode<T extends BaseNodeData> {
     }
     w.keyVal("height", this.height);
     w.keySingleQuoted("id", this.id);
+    if ((this as any).parentId) {
+      w.keySingleQuoted("parentId", (this as any).parentId);
+    }
     w.key("position");
-    w.indent(() => {
-      w.keyVal("x", this.position.x);
-      w.keyVal("y", this.position.y);
-    });
+    w.incIndent();
+    w.keyVal("x", this.position.x);
+    w.keyVal("y", this.position.y);
+    w.decIndent();
     w.key("positionAbsolute");
-    w.indent(() => {
-      w.keyVal("x", this.positionAbsolute.x);
-      w.keyVal("y", this.positionAbsolute.y);
-    });
+    w.incIndent();
+    w.keyVal("x", this.positionAbsolute.x);
+    w.keyVal("y", this.positionAbsolute.y);
+    w.decIndent();
     w.keyVal("selected", this.selected);
     w.keyVal("sourcePosition", this.sourcePosition);
     w.keyVal("targetPosition", this.targetPosition);
@@ -77,12 +80,19 @@ export abstract class BaseNode<T extends BaseNodeData> {
 
   protected writeDataHead(w: YAMLWriter): void {
     w.key("data");
-    w.indent(() => {
-      w.keyVal("type", this.data.type);
-      w.keyQuoted("title", this.data.title);
-      w.keyQuoted("desc", this.data.desc);
-      w.keyVal("selected", this.data.selected);
-    });
+    w.incIndent();
+    w.keyQuoted("desc", this.data.desc);
+    w.keyVal("selected", this.data.selected);
+    w.keyQuoted("title", this.data.title);
+    w.keyVal("type", this.data.type);
+  }
+
+  protected closeData(w: YAMLWriter): void {
+    if ((this as any).isInIteration) {
+      w.keyVal("isInIteration", true);
+      w.keySingleQuoted("iteration_id", (this as any).iterationId);
+    }
+    w.decIndent();
   }
 
   abstract toYAML(w: YAMLWriter): void;

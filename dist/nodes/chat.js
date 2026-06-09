@@ -13,21 +13,29 @@ class StartNode extends base_1.BaseNode {
         w.listItem(() => {
             this.writeDataHead(w);
             w.key("variables");
-            w.indent(() => {
-                this.data.variables.forEach(v => {
-                    w.listItem(() => {
-                        w.keyQuoted("label", v.label);
-                        if (v.max_length)
-                            w.keyVal("max_length", v.max_length);
+            w.incIndent();
+            this.data.variables.forEach(v => {
+                w.listItem(() => {
+                    w.keyQuoted("label", v.label);
+                    if (v.max_length)
+                        w.keyVal("max_length", v.max_length);
+                    if (v.options.length === 0) {
+                        w.raw("options: []");
+                    }
+                    else {
                         w.key("options");
-                        w.indent(() => v.options.forEach(o => w.raw(`- ${o}`)));
-                        w.keyQuoted("placeholder", v.placeholder ?? "");
-                        w.keyVal("required", v.required);
-                        w.keyVal("type", v.type);
-                        w.keyVal("variable", v.variable);
-                    });
+                        w.incIndent();
+                        v.options.forEach(o => w.raw(`- ${o}`));
+                        w.decIndent();
+                    }
+                    w.keyQuoted("placeholder", v.placeholder ?? "");
+                    w.keyVal("required", v.required);
+                    w.keyVal("type", v.type);
+                    w.keyVal("variable", v.variable);
                 });
             });
+            w.decIndent();
+            this.closeData(w);
             this.writeOuter(w);
         });
     }
@@ -37,7 +45,10 @@ class StartNode extends base_1.BaseNode {
         const d = raw.data;
         node.data.title = d.title;
         node.data.desc = d.desc;
-        node.data.variables = d.variables ?? [];
+        node.data.variables = (d.variables ?? []).map(v => ({
+            ...v,
+            options: v.options ?? [],
+        }));
         node.width = raw.width;
         node.height = raw.height;
         return node;
@@ -56,20 +67,21 @@ class AnswerNode extends base_1.BaseNode {
             this.writeDataHead(w);
             w.keyQuoted("answer", this.data.answer);
             w.key("variables");
-            w.indent(() => {
-                this.data.variables.forEach(v => {
-                    w.listItem(() => {
-                        w.keyVal("variable", v.variable);
-                        w.key("value_selector");
-                        w.indent(() => {
-                            w.keySingleQuoted("-", v.value_selector[0]);
-                            w.raw(`- ${v.value_selector[1]}`);
-                        });
-                        if (v.value_type)
-                            w.keyVal("value_type", v.value_type);
-                    });
+            w.incIndent();
+            this.data.variables.forEach(v => {
+                w.listItem(() => {
+                    w.keyVal("variable", v.variable);
+                    w.key("value_selector");
+                    w.incIndent();
+                    w.raw(`- '${v.value_selector[0]}'`);
+                    w.raw(`- ${v.value_selector[1]}`);
+                    w.decIndent();
+                    if (v.value_type)
+                        w.keyVal("value_type", v.value_type);
                 });
             });
+            w.decIndent();
+            this.closeData(w);
             this.writeOuter(w);
         });
     }
@@ -103,61 +115,76 @@ class LLMNode extends base_1.BaseNode {
             this.writeDataHead(w);
             // context
             w.key("context");
-            w.indent(() => {
-                w.keyVal("enabled", this.data.context.enabled);
+            w.incIndent();
+            w.keyVal("enabled", this.data.context.enabled);
+            if (this.data.context.variable_selector.length === 0) {
+                w.raw("variable_selector: []");
+            }
+            else {
                 w.key("variable_selector");
-                w.indent(() => this.data.context.variable_selector.forEach(s => w.raw(`- ${s}`)));
-            });
+                w.incIndent();
+                this.data.context.variable_selector.forEach((s, i) => {
+                    if (i === 0)
+                        w.raw(`- '${s}'`);
+                    else
+                        w.raw(`- ${s}`);
+                });
+                w.decIndent();
+            }
+            w.decIndent();
             // memory
             if (this.data.memory) {
                 w.key("memory");
-                w.indent(() => {
-                    w.keyQuoted("query_prompt_template", this.data.memory.query_prompt_template);
-                    if (this.data.memory.role_prefix) {
-                        w.key("role_prefix");
-                        w.indent(() => {
-                            w.keyQuoted("assistant", this.data.memory.role_prefix.assistant);
-                            w.keyQuoted("user", this.data.memory.role_prefix.user);
-                        });
-                    }
-                    w.key("window");
-                    w.indent(() => {
-                        w.keyVal("enabled", this.data.memory.window.enabled);
-                        w.keyVal("size", this.data.memory.window.size);
-                    });
-                });
+                w.incIndent();
+                w.keyQuoted("query_prompt_template", this.data.memory.query_prompt_template);
+                if (this.data.memory.role_prefix) {
+                    w.key("role_prefix");
+                    w.incIndent();
+                    w.keyQuoted("assistant", this.data.memory.role_prefix.assistant);
+                    w.keyQuoted("user", this.data.memory.role_prefix.user);
+                    w.decIndent();
+                }
+                w.key("window");
+                w.incIndent();
+                w.keyVal("enabled", this.data.memory.window.enabled);
+                w.keyVal("size", this.data.memory.window.size);
+                w.decIndent();
+                w.decIndent();
             }
             // model
             w.key("model");
-            w.indent(() => {
-                w.key("completion_params");
-                w.indent(() => {
-                    Object.entries(this.data.model.completion_params).forEach(([k, v]) => {
-                        if (typeof v === "string")
-                            w.keyQuoted(k, v);
-                        else
-                            w.keyVal(k, v);
-                    });
-                });
-                w.keyVal("mode", this.data.model.mode);
-                w.keyQuoted("name", this.data.model.name);
-                w.keyQuoted("provider", this.data.model.provider);
+            w.incIndent();
+            w.key("completion_params");
+            w.incIndent();
+            Object.entries(this.data.model.completion_params).forEach(([k, v]) => {
+                if (typeof v === "string")
+                    w.keyQuoted(k, v);
+                else
+                    w.keyVal(k, v);
             });
+            w.decIndent();
+            w.keyVal("mode", this.data.model.mode);
+            w.keyQuoted("name", this.data.model.name);
+            w.keyQuoted("provider", this.data.model.provider);
+            w.decIndent();
             // prompt_template
             w.key("prompt_template");
-            w.indent(() => {
-                this.data.prompt_template.forEach(p => {
-                    w.listItem(() => {
-                        if (p.id)
-                            w.keyVal("id", p.id);
-                        w.keyVal("role", p.role);
-                        w.blockScalar("text", p.text);
-                    });
+            w.incIndent();
+            this.data.prompt_template.forEach(p => {
+                w.listItem(() => {
+                    if (p.id)
+                        w.keyVal("id", p.id);
+                    w.keyVal("role", p.role);
+                    w.blockScalar("text", p.text);
                 });
             });
+            w.decIndent();
             // vision
             w.key("vision");
-            w.indent(() => w.keyVal("enabled", this.data.vision.enabled));
+            w.incIndent();
+            w.keyVal("enabled", this.data.vision.enabled);
+            w.decIndent();
+            this.closeData(w);
             this.writeOuter(w);
         });
     }

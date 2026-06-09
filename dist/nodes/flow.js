@@ -18,21 +18,24 @@ class KnowledgeNode extends base_1.BaseNode {
         w.listItem(() => {
             this.writeDataHead(w);
             w.key("dataset_ids");
-            w.indent(() => this.data.dataset_ids.forEach(ds => w.raw(`- ${ds}`)));
+            w.incIndent();
+            this.data.dataset_ids.forEach(ds => w.raw(`- ${ds}`));
+            w.decIndent();
             if (this.data.retrieval_mode === "multiple" && this.data.multiple_retrieval_config) {
                 w.key("multiple_retrieval_config");
-                w.indent(() => {
-                    w.keyVal("reranking_enable", this.data.multiple_retrieval_config.reranking_enable);
-                    w.key("score_threshold");
-                    w.keyVal("top_k", this.data.multiple_retrieval_config.top_k);
-                });
+                w.incIndent();
+                w.keyVal("reranking_enable", this.data.multiple_retrieval_config.reranking_enable);
+                w.key("score_threshold");
+                w.keyVal("top_k", this.data.multiple_retrieval_config.top_k);
+                w.decIndent();
             }
             w.key("query_variable_selector");
-            w.indent(() => {
-                w.keySingleQuoted("-", this.data.query_variable_selector[0]);
-                w.raw(`- ${this.data.query_variable_selector[1]}`);
-            });
+            w.incIndent();
+            w.raw(`- '${this.data.query_variable_selector[0]}'`);
+            w.raw(`- ${this.data.query_variable_selector[1]}`);
+            w.decIndent();
             w.keyVal("retrieval_mode", this.data.retrieval_mode);
+            this.closeData(w);
             this.writeOuter(w);
         });
     }
@@ -63,32 +66,33 @@ class IfElseNode extends base_1.BaseNode {
         w.listItem(() => {
             this.writeDataHead(w);
             w.key("cases");
-            w.indent(() => {
-                this.data.cases.forEach(c => {
-                    w.listItem(() => {
-                        w.keyVal("case_id", `'${c.case_id}'`);
-                        w.key("conditions");
-                        w.indent(() => {
-                            c.conditions.forEach(cond => {
-                                w.listItem(() => {
-                                    w.keyQuoted("comparison_operator", cond.comparison_operator);
-                                    if (cond.id)
-                                        w.keyVal("id", cond.id);
-                                    w.keySingleQuoted("value", cond.value ?? "");
-                                    w.keyVal("varType", cond.varType ?? "string");
-                                    w.key("variable_selector");
-                                    w.indent(() => {
-                                        w.keySingleQuoted("-", cond.variable_selector[0]);
-                                        w.raw(`- ${cond.variable_selector[1]}`);
-                                    });
-                                });
-                            });
+            w.incIndent();
+            this.data.cases.forEach(c => {
+                w.listItem(() => {
+                    w.keyVal("case_id", `'${c.case_id}'`);
+                    w.key("conditions");
+                    w.incIndent();
+                    c.conditions.forEach(cond => {
+                        w.listItem(() => {
+                            w.keyQuoted("comparison_operator", cond.comparison_operator);
+                            if (cond.id)
+                                w.keyVal("id", cond.id);
+                            w.keySingleQuoted("value", cond.value ?? "");
+                            w.keyVal("varType", cond.varType ?? "string");
+                            w.key("variable_selector");
+                            w.incIndent();
+                            w.raw(`- '${cond.variable_selector[0]}'`);
+                            w.raw(`- ${cond.variable_selector[1]}`);
+                            w.decIndent();
                         });
-                        w.keyVal("id", `'${c.id}'`);
-                        w.keyVal("logical_operator", c.logical_operator);
                     });
+                    w.decIndent();
+                    w.keyVal("id", `'${c.id}'`);
+                    w.keyVal("logical_operator", c.logical_operator);
                 });
             });
+            w.decIndent();
+            this.closeData(w);
             this.writeOuter(w);
         });
     }
@@ -117,20 +121,21 @@ class TemplateNode extends base_1.BaseNode {
             this.writeDataHead(w);
             w.keyQuoted("template", this.data.template);
             w.key("variables");
-            w.indent(() => {
-                this.data.variables.forEach(v => {
-                    w.listItem(() => {
-                        w.key("value_selector");
-                        w.indent(() => {
-                            w.keySingleQuoted("-", v.value_selector[0]);
-                            w.raw(`- ${v.value_selector[1]}`);
-                        });
-                        if (v.value_type)
-                            w.keyVal("value_type", v.value_type);
-                        w.keyVal("variable", v.variable);
-                    });
+            w.incIndent();
+            this.data.variables.forEach(v => {
+                w.listItem(() => {
+                    w.key("value_selector");
+                    w.incIndent();
+                    w.raw(`- '${v.value_selector[0]}'`);
+                    w.raw(`- ${v.value_selector[1]}`);
+                    w.decIndent();
+                    if (v.value_type)
+                        w.keyVal("value_type", v.value_type);
+                    w.keyVal("variable", v.variable);
                 });
             });
+            w.decIndent();
+            this.closeData(w);
             this.writeOuter(w);
         });
     }
@@ -160,14 +165,15 @@ class AggregatorNode extends base_1.BaseNode {
             this.writeDataHead(w);
             w.keyVal("output_type", this.data.output_type);
             w.key("variables");
-            w.indent(() => {
-                this.data.variables.forEach(v => {
-                    w.listItem(() => {
-                        w.raw(`- '${v[0]}'`);
-                        w.raw(`- ${v[1]}`);
-                    });
+            w.incIndent();
+            this.data.variables.forEach(v => {
+                w.listItem(() => {
+                    w.raw(`- '${v[0]}'`);
+                    w.raw(`- ${v[1]}`);
                 });
             });
+            w.decIndent();
+            this.closeData(w);
             this.writeOuter(w);
         });
     }
@@ -233,19 +239,20 @@ class IterationNode extends base_1.BaseNode {
             w.keyVal("is_parallel", this.data.is_parallel);
             w.keyVal("iterator_input_type", this.data.iterator_input_type);
             w.key("iterator_selector");
-            w.indent(() => {
-                w.keySingleQuoted("-", this.data.iterator_selector[0]);
-                w.raw(`- ${this.data.iterator_selector[1]}`);
-            });
+            w.incIndent();
+            w.raw(`- '${this.data.iterator_selector[0]}'`);
+            w.raw(`- ${this.data.iterator_selector[1]}`);
+            w.decIndent();
             w.key("output_selector");
-            w.indent(() => {
-                w.keySingleQuoted("-", this.data.output_selector[0]);
-                w.raw(`- ${this.data.output_selector[1]}`);
-            });
+            w.incIndent();
+            w.raw(`- '${this.data.output_selector[0]}'`);
+            w.raw(`- ${this.data.output_selector[1]}`);
+            w.decIndent();
             w.keyVal("output_type", this.data.output_type);
             w.keyVal("parallel_nums", this.data.parallel_nums);
             w.keySingleQuoted("start_node_id", this.data.start_node_id);
             w.keyVal("width", this.data.width);
+            this.closeData(w);
             this.writeOuter(w);
         });
         // Write child nodes
@@ -283,7 +290,8 @@ class IterationStartNode extends base_1.BaseNode {
         super(id, "custom-iteration-start", {
             type: "iteration-start", title: data?.title ?? "", desc: data?.desc ?? "", selected: false,
             isInIteration: true, iteration_id: parentIterId,
-        }, { width: 44, height: 48 });
+            height: data?.height ?? 64, width: data?.width ?? 44,
+        }, { width: data?.width ?? 44, height: 48 });
         this.parentId = parentIterId;
         this.data.isInIteration = true;
         this.data.iteration_id = parentIterId;
@@ -295,20 +303,31 @@ class IterationStartNode extends base_1.BaseNode {
             w.keySingleQuoted("id", this.id);
             w.keySingleQuoted("parentId", this.parentId);
             w.key("position");
-            w.indent(() => { w.keyVal("x", this.position.x); w.keyVal("y", this.position.y); });
+            w.incIndent();
+            w.keyVal("x", this.position.x);
+            w.keyVal("y", this.position.y);
+            w.decIndent();
             w.key("positionAbsolute");
-            w.indent(() => { w.keyVal("x", this.positionAbsolute.x); w.keyVal("y", this.positionAbsolute.y); });
+            w.incIndent();
+            w.keyVal("x", this.positionAbsolute.x);
+            w.keyVal("y", this.positionAbsolute.y);
+            w.decIndent();
             w.keyVal("selectable", false);
             w.keyVal("sourcePosition", this.sourcePosition);
             w.keyVal("targetPosition", this.targetPosition);
             w.keyVal("type", this.type);
             w.keyVal("width", this.width);
             w.key("data");
-            w.indent(() => {
-                w.keyVal("isInIteration", true);
-                w.keySingleQuoted("iteration_id", this.parentId);
-                w.keyVal("type", "iteration-start");
-            });
+            w.incIndent();
+            w.keyQuoted("desc", this.data.desc);
+            w.keyVal("height", this.data.height ?? this.height);
+            w.keyVal("isInIteration", true);
+            w.keySingleQuoted("iteration_id", this.parentId);
+            w.keyVal("selected", false);
+            w.keyQuoted("title", this.data.title);
+            w.keyVal("type", "iteration-start");
+            w.keyVal("width", this.data.width ?? this.width);
+            w.decIndent();
         });
     }
     static fromYAML(raw) {
@@ -316,6 +335,7 @@ class IterationStartNode extends base_1.BaseNode {
         const node = new IterationStartNode(raw.parentId, {
             title: d.title, desc: d.desc,
             iteration_id: d.iteration_id,
+            height: d.height, width: d.width,
         });
         node.id = raw.id;
         node.setPosition(raw.position.x, raw.position.y);

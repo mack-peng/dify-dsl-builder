@@ -9,6 +9,7 @@ export class Edge {
   zIndex: number;
   isInIteration: boolean;
   isInLoop: boolean;
+  iterationId?: string;
 
   // sourceType / targetType are inferred at save time, not stored
 
@@ -17,7 +18,7 @@ export class Edge {
     target: string,
     sourceHandle: string = "source",
     targetHandle: string = "target",
-    opts?: { zIndex?: number; isInIteration?: boolean; isInLoop?: boolean }
+    opts?: { zIndex?: number; isInIteration?: boolean; isInLoop?: boolean; iterationId?: string }
   ) {
     this.source = source;
     this.target = target;
@@ -27,6 +28,7 @@ export class Edge {
     this.zIndex = opts?.zIndex ?? 0;
     this.isInIteration = opts?.isInIteration ?? false;
     this.isInLoop = opts?.isInLoop ?? false;
+    this.iterationId = opts?.iterationId;
   }
 
   redirect(newTarget: string): void {
@@ -35,38 +37,46 @@ export class Edge {
   }
 
   toYAML(w: YAMLWriter, sourceType: string, targetType: string): void {
-    w.raw(`- id: ${this.id}`);
-    w.indent(() => {
-      w.keyVal("type", "custom");
+    w.listItem(() => {
+      w.key("data");
+      w.incIndent();
+      w.keyVal("isInIteration", this.isInIteration);
+      w.keyVal("isInLoop", this.isInLoop);
+      if (this.iterationId) {
+        w.keySingleQuoted("iteration_id", this.iterationId);
+      }
+      w.keyVal("sourceType", sourceType);
+      w.keyVal("targetType", targetType);
+      w.decIndent();
+      w.keyVal("id", this.id);
       w.keySingleQuoted("source", this.source);
-      w.keySingleQuoted("sourceHandle", this.sourceHandle);
+      if (this.sourceHandle === "true" || this.sourceHandle === "false") {
+        w.keySingleQuoted("sourceHandle", this.sourceHandle);
+      } else {
+        w.keyVal("sourceHandle", this.sourceHandle);
+      }
       w.keySingleQuoted("target", this.target);
       w.keyVal("targetHandle", this.targetHandle);
+      w.keyVal("type", "custom");
       w.keyVal("zIndex", this.zIndex);
-      w.key("data");
-      w.indent(() => {
-        w.keyVal("sourceType", sourceType);
-        w.keyVal("targetType", targetType);
-        w.keyVal("isInIteration", this.isInIteration);
-        w.keyVal("isInLoop", this.isInLoop);
-      });
     });
   }
 
   static fromYAML(raw: Record<string, unknown>): Edge {
+    const data = raw.data as Record<string, unknown> | undefined;
     const e = new Edge(
       raw.source as string,
       raw.target as string,
       raw.sourceHandle as string,
-      raw.targetHandle as string
+      raw.targetHandle as string,
+      {
+        zIndex: raw.zIndex as number,
+        isInIteration: data?.isInIteration as boolean,
+        isInLoop: data?.isInLoop as boolean,
+        iterationId: data?.iteration_id as string,
+      }
     );
     e.id = raw.id as string;
-    if (typeof raw.zIndex === "number") e.zIndex = raw.zIndex;
-    const data = raw.data as Record<string, unknown> | undefined;
-    if (data) {
-      if (typeof data.isInIteration === "boolean") e.isInIteration = data.isInIteration;
-      if (typeof data.isInLoop === "boolean") e.isInLoop = data.isInLoop;
-    }
     return e;
   }
 }

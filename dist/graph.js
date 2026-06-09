@@ -8,7 +8,22 @@ class Graph {
     get nodeCount() { return this._nodes.size; }
     get edgeCount() { return this._edges.length; }
     // === Top-level find (no iteration recursion) ===
-    find(id) { return this._nodes.get(id); }
+    find(id) {
+        const n = this._nodes.get(id);
+        if (n)
+            return n;
+        // Search inside iteration children
+        for (const node of this._nodes.values()) {
+            if (node instanceof nodes_1.IterationNode) {
+                if (node.startNode?.id === id)
+                    return node.startNode;
+                const child = node.children.find(c => c.id === id);
+                if (child)
+                    return child;
+            }
+        }
+        return undefined;
+    }
     findStart(id) {
         const n = this._nodes.get(id);
         return n instanceof nodes_1.StartNode ? n : undefined;
@@ -99,32 +114,27 @@ class Graph {
         w.indent(() => {
             // Edges
             w.key("edges");
-            w.indent(() => {
-                this._edges.forEach(e => {
-                    const srcNode = this.find(e.source);
-                    const tgtNode = this.find(e.target);
-                    if (!srcNode || !tgtNode)
-                        return;
-                    let srcType = srcNode.data.type;
-                    let tgtType = tgtNode.data.type;
-                    e.toYAML(w, srcType, tgtType);
-                });
+            this._edges.forEach(e => {
+                const srcNode = this.find(e.source);
+                const tgtNode = this.find(e.target);
+                if (!srcNode || !tgtNode)
+                    return;
+                let srcType = srcNode.data.type;
+                let tgtType = tgtNode.data.type;
+                e.toYAML(w, srcType, tgtType);
             });
             // Nodes
             w.key("nodes");
-            w.indent(() => {
-                // Top-level nodes (not iteration-start, not in iteration)
-                for (const n of this._nodes.values()) {
-                    if (n instanceof nodes_1.IterationStartNode)
-                        continue;
-                    // IterationNode writes itself and all children
-                    if (n instanceof nodes_1.IterationNode) {
-                        n.toYAML(w);
-                        continue;
-                    }
+            // Top-level nodes (not iteration-start, not in iteration)
+            for (const n of this._nodes.values()) {
+                if (n instanceof nodes_1.IterationStartNode)
+                    continue;
+                if (n instanceof nodes_1.IterationNode) {
                     n.toYAML(w);
+                    continue;
                 }
-            });
+                n.toYAML(w);
+            }
             // viewport
             w.key("viewport");
             w.indent(() => {

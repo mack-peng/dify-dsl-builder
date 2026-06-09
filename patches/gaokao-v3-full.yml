@@ -1,0 +1,253 @@
+description: "高考志愿推荐助手 v3 完整 spec 实现 — Part 1~5 全部变更"
+steps:
+  # ═══════════════════════════════════════
+  # Part 1: 架构重构 — 分类器前移 + Answer 互斥
+  # ═══════════════════════════════════════
+
+  # 1a. 分裂器 ✓ 不再直连本科
+  - remove-edge:
+      source: "1747500000001"
+      target: "1747000003001"
+  - remove-edge:
+      source: "1747500000001"
+      target: "1747000006001"
+
+  # 1b. 分裂器 ✓ → 分类器
+  - add-edge:
+      source: "1747500000001"
+      target: "1780889576194"
+      handle: "true"
+
+  # 1c. 分类器新增 undergrad_school class
+  - add-classifier-class:
+      classifier: "1780889576194"
+      id: "undergrad_school"
+      name: "本科学校/专业推荐"
+
+  # 1d. 分类器 → 本科后端
+  - add-edge:
+      source: "1780889576194"
+      target: "1747000003001"
+      handle: "undergrad_school"
+  - add-edge:
+      source: "1780889576194"
+      target: "1747000006001"
+      handle: "undergrad_school"
+
+  # 1e. 分类器标题/位置
+  - set-title:
+      id: "1780889576194"
+      value: "意图分类器（本科/专科共享）"
+  - set-position:
+      id: "1780889576194"
+      x: 730
+      y: 250
+
+  # 1f. 输出选择器 CodeNode
+  - add-code-node:
+      id: "1790000000200"
+      title: "输出选择器"
+      desc: "按优先级互斥：错误 > 分数异常 > 本科 > 专科"
+      code: |
+        def main(error_msg: str, undergrad_tip: str, undergrad_text: str, zhuan_ke_output: str) -> dict:
+            if error_msg and error_msg.strip():
+                return {"answer": error_msg}
+            parts = []
+            if undergrad_tip and undergrad_tip.strip():
+                parts.append(undergrad_tip)
+            if undergrad_text and undergrad_text.strip():
+                parts.append(undergrad_text)
+            if parts:
+                return {"answer": "\n".join(parts)}
+            if zhuan_ke_output and zhuan_ke_output.strip():
+                return {"answer": zhuan_ke_output}
+            return {"answer": "抱歉，暂时无法生成推荐结果。"}
+      code_language: python3
+      position: { x: 4200, y: 600 }
+      variables:
+        - { variable: "error_msg",       value_selector: ["1790000000100", "error_msg"],     value_type: "string" }
+        - { variable: "undergrad_tip",   value_selector: ["1780889576207", "undergrad_tip"], value_type: "string" }
+        - { variable: "undergrad_text",  value_selector: ["1747000021001", "text"],          value_type: "string" }
+        - { variable: "zhuan_ke_output", value_selector: ["1780889576242", "output"],        value_type: "string" }
+      outputs:
+        answer: { type: "string" }
+
+  # 1g. 重连 Answer → 输出选择器
+  - remove-edge:
+      source: "1747000021001"
+      target: "1747000024001"
+  - remove-edge:
+      source: "1780889576242"
+      target: "1747000024001"
+  - remove-edge:
+      source: "1790000000101"
+      target: "1747000024001"
+
+  - add-edge:
+      source: "1747000021001"
+      target: "1790000000200"
+  - add-edge:
+      source: "1780889576242"
+      target: "1790000000200"
+  - add-edge:
+      source: "1790000000101"
+      target: "1790000000200"
+      handle: "true"
+  - add-edge:
+      source: "1790000000200"
+      target: "1747000024001"
+
+  # 1h. Answer 模板
+  - set-answer:
+      id: "1747000024001"
+      answer: "{{#1790000000200.answer#}}"
+
+  # ═══════════════════════════════════════
+  # Part 2: 数据模型 — 2.4 文案修正
+  # ═══════════════════════════════════════
+
+  - set-start-var:
+      id: "1747000000001"
+      variable: "interests"
+      field: "placeholder"
+      value: "例如：汽车维修、计算机编程、护理医学、学前教育、财经会计...（必填 1-2 个具体方向）"
+
+  # 本科 LLM 移除"如果未填写兴趣方向则主动询问"死代码规则
+  - set-prompt:
+      id: "1747000021001"
+      role: "system"
+      replace: "- 如果用户未填写兴趣方向，主动询问他们的偏好学科或感兴趣的领域，引导用户提供更多信息后再做推荐 "
+      with: ""
+
+  # ═══════════════════════════════════════
+  # Part 3: 核心功能 — 推荐报告增强
+  # ═══════════════════════════════════════
+
+  # 3a. 本科 LLM — 人设切换
+  - set-prompt:
+      id: "1747000021001"
+      role: "system"
+      replace: "你是一位资深高考志愿填报专家。请根据以下信息为用户提供专业推荐。"
+      with: "你是一位资深高考志愿填报专家，面向四川省本科段考生。请根据以下信息提供专业推荐，重点匹配本科院校及全国985/211高校。"
+
+  # 3b. 本科 LLM — 对比表追加列: 批次 + 2023分数 + 近3年趋势
+  - set-prompt:
+      id: "1747000021001"
+      role: "system"
+      replace: "| 学校名称 | 专业名称 | 所属院系 | 2025分数 | 2024分数 | 匹配度 |"
+      with: "| 学校名称 | 专业名称 | 所属院系 | 所属批次 | 2025分数 | 2024分数 | 2023分数 | 近3年趋势 | 匹配度 |"
+
+  # 3c. 本科 LLM — 追加冲稳保表格和批次提示
+  - set-prompt:
+      id: "1747000021001"
+      role: "system"
+      replace: "## 重要规则"
+      with: "### 五、志愿填报策略（冲·稳·保）\n\n| 志愿序号 | 学校名称 | 专业名称 | 策略类型 | 理由 |\n|----------|----------|----------|----------|------|\n| 1 | — | — | 冲 | 高于位次0-3分 |\n| 2 | — | — | 稳 | ±3分范围 |\n| 3 | — | — | 保 | 低于5-15分 |\n\n根据四川省平行志愿投档规则排列。若分数刚过本科线，可同时填报本科批和专科批。\n\n## 重要规则"
+
+  # 3d. 专科 LLM — 人设修改
+  - set-prompt:
+      id: "1780889576212"
+      role: "system"
+      replace: "你是一位资深专科高考志愿填报专家。请根据以下信息为用户提供专业推荐。"
+      with: "你是一位专科高考志愿填报专家，面向四川省专科段考生（含高职院校）。请根据以下信息提供专业推荐，重点匹配专科院校和高职院校。"
+
+  - set-prompt:
+      id: "1780889576212"
+      role: "system"
+      replace: "| 学校名称 | 专业名称 | 所属院系 | 2025分数 | 2024分数 | 匹配度 |"
+      with: "| 学校名称 | 专业名称 | 所属院系 | 所属批次 | 2025分数 | 2024分数 | 2023分数 | 近3年趋势 | 匹配度 |"
+
+  - set-prompt:
+      id: "1780889576212"
+      role: "system"
+      replace: "## 重要规则"
+      with: "### 五、志愿填报策略（冲·稳·保）\n\n| 志愿序号 | 学校名称 | 专业名称 | 策略类型 | 理由 |\n|----------|----------|----------|----------|------|\n| 1 | — | — | 冲 | 高于位次0-3分 |\n| 2 | — | — | 稳 | ±3分范围 |\n| 3 | — | — | 保 | 低于5-15分 |\n\n根据四川省专科批投档规则排列。分公办/民办标注学校性质。\n\n## 重要规则"
+
+  # 3e. 重新推荐 LLM 同步增强
+  - set-prompt:
+      id: "1780889576240"
+      role: "system"
+      replace: "| 学校名称 | 专业名称 | 所属院系 | 2025分数 | 2024分数 | 匹配度 |"
+      with: "| 学校名称 | 专业名称 | 所属院系 | 所属批次 | 2025分数 | 2024分数 | 2023分数 | 近3年趋势 | 匹配度 |"
+
+  # ═══════════════════════════════════════
+  # Part 4: 交互优化
+  # ═══════════════════════════════════════
+
+  # 4a. 修正 36 类文本 (4.3)
+  - set-prompt:
+      id: "1747000021001"
+      role: "system"
+      replace: "36类显示不规范"
+      with: "选科类别不规范"
+
+  # 4b. 本科 LLM 末尾追加差异化引导
+  - set-prompt:
+      id: "1747000021001"
+      role: "system"
+      replace: "追加一行引导语，帮助用户知道接下来可以问什么。参考格式："
+      with: "追加差异化引导语：\n- 这个专业的就业前景怎么样？\n- 学费和奖学金情况如何？\n- 往年录取分数趋势？"
+
+  # 4c. 专科 LLM 末尾追加差异化引导
+  - set-prompt:
+      id: "1780889576212"
+      role: "system"
+      replace: "在免责声明之后追加引导语："
+      with: "在免责声明之后追加差异化引导语：\n- 这个专业的就业率如何？\n- 学费和奖学金有哪些？\n- 专升本难度大吗？\n- 有没有校企合作项目？\n参考格式："
+
+  # 4d. 记忆共享 — conversation_variables (4.4)
+  - conv-set:
+      name: "user_context"
+      value_type: "string"
+
+  # ═══════════════════════════════════════
+  # Part 5: 稳定性
+  # ═══════════════════════════════════════
+
+  # 5a. 搜索降级 — 所有格式化搜索 CodeNode 空结果兜底 (5.1)
+  - set-code:
+      id: "1782000000002"
+      replace: "return { result: combinedText };"
+      with: "return { result: combinedText || \"[网络搜索暂时不可用]\" };"
+  - set-code:
+      id: "1782000000004"
+      replace: "return { result: combinedText };"
+      with: "return { result: combinedText || \"[网络搜索暂时不可用]\" };"
+  - set-code:
+      id: "1780889576209"
+      replace: "return { result: combinedText };"
+      with: "return { result: combinedText || \"[网络搜索暂时不可用]\" };"
+  - set-code:
+      id: "1780889576211"
+      replace: "return { result: combinedText };"
+      with: "return { result: combinedText || \"[网络搜索暂时不可用]\" };"
+  - set-code:
+      id: "1780889576224"
+      replace: "return { result: combinedText };"
+      with: "return { result: combinedText || \"[网络搜索暂时不可用]\" };"
+  - set-code:
+      id: "1780889576227"
+      replace: "return { result: combinedText };"
+      with: "return { result: combinedText || \"[网络搜索暂时不可用]\" };"
+  - set-code:
+      id: "1780889576230"
+      replace: "return { result: combinedText };"
+      with: "return { result: combinedText || \"[网络搜索暂时不可用]\" };"
+  - set-code:
+      id: "1780889576233"
+      replace: "return { result: combinedText };"
+      with: "return { result: combinedText || \"[网络搜索暂时不可用]\" };"
+  - set-code:
+      id: "1780889576239"
+      replace: "return { result: combinedText };"
+      with: "return { result: combinedText || \"[网络搜索暂时不可用]\" };"
+
+  # 5b. 环境变量 (5.3)
+  - env-set:
+      name: "GAOKAO_BENKE_LINE"
+      value: 450
+      type: "number"
+  - env-set:
+      name: "GAOKAO_MIN_VALID"
+      value: 150
+      type: "number"

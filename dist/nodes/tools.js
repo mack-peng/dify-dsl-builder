@@ -29,57 +29,64 @@ class ToolNode extends base_1.BaseNode {
             w.keyVal("is_team_authorization", this.data.is_team_authorization);
             // paramSchemas
             w.key("paramSchemas");
-            w.indent(() => {
-                this.data.paramSchemas.forEach(ps => {
-                    w.listItem(() => {
-                        w.key("auto_generate");
-                        w.key("default");
-                        w.keyVal("form", ps.form);
-                        w.key("human_description");
-                        w.indent(() => Object.entries(ps.human_description).forEach(([k, v]) => w.keyQuoted(k, v)));
-                        w.key("label");
-                        w.indent(() => Object.entries(ps.label).forEach(([k, v]) => w.keyQuoted(k, v)));
-                        w.keyQuoted("llm_description", ps.llm_description);
-                        w.key("max");
-                        w.key("min");
-                        w.keyVal("name", ps.name);
-                        w.key("options").raw("[]");
-                        w.key("placeholder");
-                        w.key("precision");
-                        w.keyVal("required", ps.required);
-                        w.key("scope");
-                        w.key("template");
-                        w.keyVal("type", ps.type);
-                    });
+            w.incIndent();
+            this.data.paramSchemas.forEach(ps => {
+                w.listItem(() => {
+                    w.key("auto_generate");
+                    w.key("default");
+                    w.keyVal("form", ps.form);
+                    w.key("human_description");
+                    w.incIndent();
+                    Object.entries(ps.human_description).forEach(([k, v]) => w.keyQuoted(k, v));
+                    w.decIndent();
+                    w.key("label");
+                    w.incIndent();
+                    Object.entries(ps.label).forEach(([k, v]) => w.keyQuoted(k, v));
+                    w.decIndent();
+                    w.keyQuoted("llm_description", ps.llm_description);
+                    w.key("max");
+                    w.key("min");
+                    w.keyVal("name", ps.name);
+                    w.raw("options: []");
+                    w.key("placeholder");
+                    w.key("precision");
+                    w.keyVal("required", ps.required);
+                    w.key("scope");
+                    w.key("template");
+                    w.keyVal("type", ps.type);
                 });
             });
+            w.decIndent();
             // params
             w.key("params");
-            w.indent(() => Object.entries(this.data.params).forEach(([k, v]) => w.keyQuoted(k, v)));
+            w.incIndent();
+            Object.entries(this.data.params).forEach(([k, v]) => w.keyQuoted(k, v));
+            w.decIndent();
             w.keyQuoted("plugin_id", this.data.plugin_id);
             w.keyQuoted("plugin_unique_identifier", this.data.plugin_unique_identifier);
             w.keyQuoted("provider_icon", this.data.provider_icon);
             w.keyQuoted("provider_id", this.data.provider_id);
             w.keyQuoted("provider_name", this.data.provider_name);
             w.keyVal("provider_type", this.data.provider_type);
-            w.key("tool_configurations").raw("{}");
+            w.raw("tool_configurations: {}");
             w.keyQuoted("tool_description", this.data.tool_description);
             w.keyQuoted("tool_label", this.data.tool_label);
             w.keyQuoted("tool_name", this.data.tool_name);
             w.keyQuoted("tool_node_version", this.data.tool_node_version);
             w.key("tool_parameters");
-            w.indent(() => {
-                Object.entries(this.data.tool_parameters).forEach(([k, v]) => {
-                    w.keyVal(k, "");
-                    w.indent(() => {
-                        w.keyVal("type", v.type);
-                        if (v.type === "mixed")
-                            w.keyQuoted("value", typeof v.value === "string" ? v.value : String(v.value ?? ""));
-                        else
-                            w.keySingleQuoted("value", typeof v.value === "string" ? v.value : String(v.value ?? ""));
-                    });
-                });
+            w.incIndent();
+            Object.entries(this.data.tool_parameters).forEach(([k, v]) => {
+                w.key(k);
+                w.incIndent();
+                w.keyVal("type", v.type);
+                if (v.type === "mixed")
+                    w.keyQuoted("value", typeof v.value === "string" ? v.value : String(v.value ?? ""));
+                else
+                    w.keySingleQuoted("value", typeof v.value === "string" ? v.value : String(v.value ?? ""));
+                w.decIndent();
             });
+            w.decIndent();
+            this.closeData(w);
             this.writeOuter(w);
         });
     }
@@ -122,37 +129,42 @@ class ClassifierNode extends base_1.BaseNode {
         w.listItem(() => {
             this.writeDataHead(w);
             w.key("classes");
-            w.indent(() => {
-                this.data.classes.forEach(c => {
-                    w.listItem(() => {
-                        w.keyQuoted("description", c.description);
-                        w.keyVal("id", c.id);
-                        w.keyQuoted("name", c.name);
-                    });
+            w.incIndent();
+            this.data.classes.forEach(c => {
+                w.listItem(() => {
+                    w.keyQuoted("description", c.description);
+                    w.keyVal("id", c.id);
+                    w.keyQuoted("name", c.name);
                 });
             });
+            w.decIndent();
             if (this.data.instructions !== undefined)
                 w.keyQuoted("instructions", this.data.instructions);
             w.key("model");
-            w.indent(() => {
-                w.key("completion_params");
-                w.indent(() => Object.entries(this.data.model.completion_params).forEach(([k, v]) => {
-                    if (typeof v === "string")
-                        w.keyQuoted(k, v);
-                    else
-                        w.keyVal(k, v);
-                }));
-                w.keyVal("mode", this.data.model.mode);
-                w.keyQuoted("name", this.data.model.name);
-                w.keyQuoted("provider", this.data.model.provider);
+            w.incIndent();
+            w.key("completion_params");
+            w.incIndent();
+            Object.entries(this.data.model.completion_params).forEach(([k, v]) => {
+                if (typeof v === "string")
+                    w.keyQuoted(k, v);
+                else
+                    w.keyVal(k, v);
             });
+            w.decIndent();
+            w.keyVal("mode", this.data.model.mode);
+            w.keyQuoted("name", this.data.model.name);
+            w.keyQuoted("provider", this.data.model.provider);
+            w.decIndent();
             w.key("query_variable_selector");
-            w.indent(() => {
-                w.keyVal("-", this.data.query_variable_selector[0]);
-                w.raw(`- ${this.data.query_variable_selector[1]}`);
-            });
+            w.incIndent();
+            w.raw(`- ${this.data.query_variable_selector[0]}`);
+            w.raw(`- ${this.data.query_variable_selector[1]}`);
+            w.decIndent();
             w.key("vision");
-            w.indent(() => w.keyVal("enabled", false));
+            w.incIndent();
+            w.keyVal("enabled", false);
+            w.decIndent();
+            this.closeData(w);
             this.writeOuter(w);
         });
     }
@@ -186,6 +198,7 @@ class HTTPNode extends base_1.BaseNode {
     toYAML(w) {
         w.listItem(() => {
             this.writeDataHead(w);
+            this.closeData(w);
             this.writeOuter(w);
         });
     }
@@ -206,6 +219,7 @@ class DocNode extends base_1.BaseNode {
     toYAML(w) {
         w.listItem(() => {
             this.writeDataHead(w);
+            this.closeData(w);
             this.writeOuter(w);
         });
     }

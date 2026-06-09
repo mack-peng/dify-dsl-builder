@@ -1,0 +1,121 @@
+description: "本科路径接入意图分类器 + Answer 互斥输出"
+steps:
+  # ── Part 1: 分裂器 ✓ 不再直连本科 ──
+  - remove-edge:
+      source: "1747500000001"
+      target: "1747000003001"
+  - remove-edge:
+      source: "1747500000001"
+      target: "1747000006001"
+
+  # ── Part 1: 分裂器 ✓ → 分类器 ──
+  - add-edge:
+      source: "1747500000001"
+      target: "1780889576194"
+      handle: "true"
+
+  # ── Part 1: 分类器新增 undergrad_school class ──
+  - add-classifier-class:
+      classifier: "1780889576194"
+      id: "undergrad_school"
+      name: "本科学校/专业推荐"
+
+  # ── Part 1: 分类器 → 本科后端 ──
+  - add-edge:
+      source: "1780889576194"
+      target: "1747000003001"
+      handle: "undergrad_school"
+  - add-edge:
+      source: "1780889576194"
+      target: "1747000006001"
+      handle: "undergrad_school"
+
+  # ── Part 1: 分类器标题/位置 ──
+  - set-title:
+      id: "1780889576194"
+      value: "意图分类器（本科/专科共享）"
+  - set-position:
+      id: "1780889576194"
+      x: 730
+      y: 250
+
+  # ── Part 2: 输出选择器 CodeNode ──
+  - add-code-node:
+      id: "1790000000200"
+      title: "输出选择器"
+      desc: "按优先级互斥：错误 > 分数异常 > 本科 > 专科"
+      code: |
+        def main(error_msg: str, undergrad_tip: str, undergrad_text: str, zhuan_ke_output: str) -> dict:
+            if error_msg and error_msg.strip():
+                return {"answer": error_msg}
+            parts = []
+            if undergrad_tip and undergrad_tip.strip():
+                parts.append(undergrad_tip)
+            if undergrad_text and undergrad_text.strip():
+                parts.append(undergrad_text)
+            if parts:
+                return {"answer": "\n".join(parts)}
+            if zhuan_ke_output and zhuan_ke_output.strip():
+                return {"answer": zhuan_ke_output}
+            return {"answer": "抱歉，暂时无法生成推荐结果。"}
+      code_language: python3
+      position: { x: 4200, y: 600 }
+      variables:
+        - { variable: "error_msg",       value_selector: ["1790000000100", "error_msg"],     value_type: "string" }
+        - { variable: "undergrad_tip",   value_selector: ["1780889576207", "undergrad_tip"], value_type: "string" }
+        - { variable: "undergrad_text",  value_selector: ["1747000021001", "text"],          value_type: "string" }
+        - { variable: "zhuan_ke_output", value_selector: ["1780889576242", "output"],        value_type: "string" }
+      outputs:
+        answer: { type: "string" }
+
+  # ── Part 2: 重连 Answer → 输出选择器 ──
+  - remove-edge:
+      source: "1747000021001"
+      target: "1747000024001"
+  - remove-edge:
+      source: "1780889576242"
+      target: "1747000024001"
+  - remove-edge:
+      source: "1790000000101"
+      target: "1747000024001"
+
+  - add-edge:
+      source: "1747000021001"
+      target: "1790000000200"
+  - add-edge:
+      source: "1780889576242"
+      target: "1790000000200"
+  - add-edge:
+      source: "1790000000101"
+      target: "1790000000200"
+      handle: "true"
+  - add-edge:
+      source: "1790000000200"
+      target: "1747000024001"
+
+  # ── Part 2: Answer 模板 ──
+  - set-answer:
+      id: "1747000024001"
+      answer: "{{#1790000000200.answer#}}"
+
+  # ── Part 3: 本科 LLM prompt 增强 ──
+  - set-prompt:
+      id: "1747000021001"
+      role: "system"
+      replace: "你是一位资深高考志愿填报专家。请根据以下信息为用户提供专业推荐。"
+      with: "你是一位资深高考志愿填报专家，面向四川省本科段考生，请根据以下信息提供专业推荐。重点匹配本科院校及全国985/211高校。"
+  - set-prompt:
+      id: "1747000021001"
+      role: "system"
+      replace: "| 学校名称 | 专业名称 | 所属院系 | 2025分数 | 2024分数 | 匹配度 |"
+      with: "| 学校名称 | 专业名称 | 所属院系 | 所属批次 | 2025分数 | 2024分数 | 2023分数 | 近3年趋势 | 匹配度 |"
+
+  # ── 环境变量 ──
+  - env-set:
+      name: "GAOKAO_BENKE_LINE"
+      value: 450
+      type: "number"
+  - env-set:
+      name: "GAOKAO_MIN_VALID"
+      value: 150
+      type: "number"

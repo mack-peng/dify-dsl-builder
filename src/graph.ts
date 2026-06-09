@@ -15,7 +15,19 @@ export class Graph {
   get edgeCount(): number { return this._edges.length; }
 
   // === Top-level find (no iteration recursion) ===
-  find(id: string): AnyNode | undefined { return this._nodes.get(id); }
+  find(id: string): AnyNode | undefined {
+    const n = this._nodes.get(id);
+    if (n) return n;
+    // Search inside iteration children
+    for (const node of this._nodes.values()) {
+      if (node instanceof IterationNode) {
+        if (node.startNode?.id === id) return node.startNode as any;
+        const child = node.children.find(c => c.id === id);
+        if (child) return child as any;
+      }
+    }
+    return undefined;
+  }
 
   findStart(id: string): StartNode | undefined {
     const n = this._nodes.get(id); return n instanceof StartNode ? n : undefined;
@@ -108,30 +120,25 @@ export class Graph {
     w.indent(() => {
       // Edges
       w.key("edges");
-      w.indent(() => {
-        this._edges.forEach(e => {
-          const srcNode = this.find(e.source);
-          const tgtNode = this.find(e.target);
-          if (!srcNode || !tgtNode) return;
-          let srcType = srcNode.data.type;
-          let tgtType = tgtNode.data.type;
-          e.toYAML(w, srcType, tgtType);
-        });
+      this._edges.forEach(e => {
+        const srcNode = this.find(e.source);
+        const tgtNode = this.find(e.target);
+        if (!srcNode || !tgtNode) return;
+        let srcType = srcNode.data.type;
+        let tgtType = tgtNode.data.type;
+        e.toYAML(w, srcType, tgtType);
       });
       // Nodes
       w.key("nodes");
-      w.indent(() => {
-        // Top-level nodes (not iteration-start, not in iteration)
-        for (const n of this._nodes.values()) {
-          if (n instanceof IterationStartNode) continue;
-          // IterationNode writes itself and all children
-          if (n instanceof IterationNode) {
-            n.toYAML(w);
-            continue;
-          }
+      // Top-level nodes (not iteration-start, not in iteration)
+      for (const n of this._nodes.values()) {
+        if (n instanceof IterationStartNode) continue;
+        if (n instanceof IterationNode) {
           n.toYAML(w);
+          continue;
         }
-      });
+        n.toYAML(w);
+      }
       // viewport
       w.key("viewport");
       w.indent(() => {

@@ -112,12 +112,11 @@ class DifyDSL {
     // === Serialization ===
     toYAML(w) {
         // --- header ---
-        w.raw("---");
         w.key("app");
         w.indent(() => {
             w.keyQuoted("description", this.app.description);
             w.keyQuoted("icon", this.app.icon);
-            w.keyQuoted("icon_background", this.app.icon_background);
+            w.keySingleQuoted("icon_background", this.app.icon_background);
             w.keyVal("mode", this.app.mode);
             w.keyQuoted("name", this.app.name);
             w.keyVal("use_icon_as_answer_icon", this.app.use_icon_as_answer_icon);
@@ -126,15 +125,13 @@ class DifyDSL {
         w.key("dependencies");
         this.dependencies.forEach(d => {
             w.listItem(() => {
-                w.key("current_identifier");
-            });
-            w.indent(() => {
+                w.keyVal("current_identifier", null);
                 w.keyVal("type", "marketplace");
                 w.key("value");
-                w.indent(() => {
-                    w.keyQuoted("marketplace_plugin_unique_identifier", d.value.marketplace_plugin_unique_identifier);
-                    w.key("version");
-                });
+                w.incIndent();
+                w.keyQuoted("marketplace_plugin_unique_identifier", d.value.marketplace_plugin_unique_identifier);
+                w.keyVal("version", null);
+                w.decIndent();
             });
         });
         w.keyVal("kind", "app");

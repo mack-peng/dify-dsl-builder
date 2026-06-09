@@ -26,30 +26,31 @@ export class CodeNode extends BaseNode<CodeNodeData> {
       w.keyVal("code_language", this.data.code_language);
       // outputs
       w.key("outputs");
-      w.indent(() => {
-        Object.entries(this.data.outputs).forEach(([name, out]) => {
-          w.key(name);
-          w.indent(() => {
-            w.key("children");
-            w.keyVal("type", out.type);
-          });
-        });
+      w.incIndent();
+      Object.entries(this.data.outputs).forEach(([name, out]) => {
+        w.key(name);
+        w.incIndent();
+        w.key("children");
+        w.keyVal("type", out.type);
+        w.decIndent();
       });
+      w.decIndent();
       // variables
       w.key("variables");
-      w.indent(() => {
-        this.data.variables.forEach(v => {
-          w.listItem(() => {
-            w.key("value_selector");
-            w.indent(() => {
-              w.raw(`- '${v.value_selector[0]}'`);
-              w.raw(`- ${v.value_selector[1]}`);
-            });
-            if (v.value_type) w.keyVal("value_type", v.value_type);
-            w.keyVal("variable", v.variable);
-          });
+      w.incIndent();
+      this.data.variables.forEach(v => {
+        w.listItem(() => {
+          w.key("value_selector");
+          w.incIndent();
+          w.raw(`- '${v.value_selector[0]}'`);
+          w.raw(`- ${v.value_selector[1]}`);
+          w.decIndent();
+          if (v.value_type) w.keyVal("value_type", v.value_type);
+          w.keyVal("variable", v.variable);
         });
       });
+      w.decIndent();
+      this.closeData(w);
       this.writeOuter(w);
     });
   }

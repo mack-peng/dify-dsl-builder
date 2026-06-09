@@ -23,6 +23,7 @@ export declare abstract class BaseNode<T extends BaseNodeData> {
     setSize(w: number, h: number): this;
     protected writeOuter(w: YAMLWriter): void;
     protected writeDataHead(w: YAMLWriter): void;
+    protected closeData(w: YAMLWriter): void;
     abstract toYAML(w: YAMLWriter): void;
     static fromYAML(raw: Record<string, unknown>): BaseNode<any>;
 }

@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "dify-dsl": "dist/cli.js"
+    "dify-dsl-cli": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",

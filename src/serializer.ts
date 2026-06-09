@@ -1,6 +1,6 @@
 export class YAMLWriter {
   private lines: string[] = [];
-  private _indent = 0;
+  _indent = 0;  // used by node base
   private _firstInListItem = false;
 
   private get spaces(): string {
@@ -10,6 +10,9 @@ export class YAMLWriter {
   private parentSpaces(): string {
     return "  ".repeat(Math.max(0, this._indent - 1));
   }
+
+  incIndent(): this { this._indent++; return this; }
+  decIndent(): this { this._indent = Math.max(0, this._indent - 1); return this; }
 
   key(k: string): this {
     if (this._firstInListItem) {
@@ -24,20 +27,22 @@ export class YAMLWriter {
   keyVal(k: string, v: string | number | boolean | null): this {
     if (this._firstInListItem) {
       this._firstInListItem = false;
-      if (v === null || v === undefined) {
+      if (v === null) {
+        this.lines.push(`${this.parentSpaces()}- ${k}: null`);
+      } else if (v === undefined) {
         this.lines.push(`${this.parentSpaces()}- ${k}:`);
       } else {
         this.lines.push(`${this.parentSpaces()}- ${k}: ${v}`);
       }
     } else {
-      if (v === null || v === undefined) {
+      if (v === null) {
+        this.lines.push(`${this.spaces}${k}: null`);
+      } else if (v === undefined) {
         this.lines.push(`${this.spaces}${k}:`);
+      } else if (typeof v === "string" && v === "") {
+        this.lines.push(`${this.spaces}${k}: ''`);
       } else if (typeof v === "string") {
-        if (v === "") {
-          this.lines.push(`${this.spaces}${k}: ''`);
-        } else {
-          this.lines.push(`${this.spaces}${k}: ${v}`);
-        }
+        this.lines.push(`${this.spaces}${k}: ${v}`);
       } else {
         this.lines.push(`${this.spaces}${k}: ${v}`);
       }
@@ -46,16 +51,22 @@ export class YAMLWriter {
   }
 
   keyQuoted(k: string, v: string): this {
+    if (typeof v !== "string") {
+      return this.keyVal(k, v as any);
+    }
     if (this._firstInListItem) {
       this._firstInListItem = false;
       this.lines.push(`${this.parentSpaces()}- ${k}: "${this.escapeDoubleQuoted(v)}"`);
       return this;
     }
 
-    if (v.includes("\\") || v.includes('"') || v.includes("\n") || v.includes("\U")) {
+    if (v === "") {
+      this.lines.push(`${this.spaces}${k}: ''`);
+      return this;
+    }
+
+    if (this.needsQuoting(v) || /^\d/.test(v) || v.length === 0) {
       this.lines.push(`${this.spaces}${k}: "${this.escapeDoubleQuoted(v)}"`);
-    } else if (this.needsQuoting(v)) {
-      this.lines.push(`${this.spaces}${k}: '${v}'`);
     } else {
       this.lines.push(`${this.spaces}${k}: ${v}`);
     }
@@ -69,7 +80,8 @@ export class YAMLWriter {
         this.lines.push(`${this.parentSpaces()}- ${k}: ""`);
         return this;
       }
-      this.lines.push(`${this.parentSpaces()}- ${k}: |-`);
+      const strip = v.endsWith("\n") ? "|" : "|-";
+      this.lines.push(`${this.parentSpaces()}- ${k}: ${strip}`);
       const lines = v.split("\n");
       for (const line of lines) {
         this.lines.push(`${this.spaces}${line}`);
@@ -81,7 +93,8 @@ export class YAMLWriter {
       this.lines.push(`${this.spaces}${k}: ""`);
       return this;
     }
-    this.lines.push(`${this.spaces}${k}: |-`);
+    const strip = v.endsWith("\n") ? "|" : "|-";
+    this.lines.push(`${this.spaces}${k}: ${strip}`);
     const lines = v.split("\n");
     for (const line of lines) {
       this.lines.push(`${this.spaces}  ${line}`);
@@ -90,7 +103,12 @@ export class YAMLWriter {
   }
 
   raw(line: string): this {
-    this.lines.push(`${this.spaces}${line}`);
+    if (this._firstInListItem) {
+      this.lines.push(`${this.parentSpaces()}- ${line}`);
+      this._firstInListItem = false;
+    } else {
+      this.lines.push(`${this.spaces}${line}`);
+    }
     return this;
   }
 
@@ -98,6 +116,13 @@ export class YAMLWriter {
     this._indent++;
     fn();
     this._indent--;
+    return this;
+  }
+
+  parentLevel(fn: () => void): this {
+    this._indent--;
+    fn();
+    this._indent++;
     return this;
   }
 
@@ -123,6 +148,10 @@ export class YAMLWriter {
   private needsQuoting(v: string): boolean {
     if (/^\d/.test(v) && v.length > 10) return true;
     if (/^(true|false|null|yes|no|on|off)$/i.test(v)) return true;
+    if (/[{}\[\],&*!|>'\"`]/.test(v)) return true;
+    if (/: |:$/.test(v)) return true;
+    if (v.startsWith("#") || /:\s*#/.test(v)) return true;
+    if (v.includes("{{") || v.includes("}}")) return true;
     return false;
   }
 

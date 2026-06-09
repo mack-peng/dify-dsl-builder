@@ -49,7 +49,7 @@ function load(yamlStr) {
     for (const rn of raw.workflow.graph.nodes) {
         rawNodeMap.set(rn.id, rn);
     }
-    // Pass 1: build top-level nodes (skip iteration-start)
+    // Pass 1: build top-level nodes (skip iteration-start and iteration children)
     const iterStartNodes = [];
     for (const rn of raw.workflow.graph.nodes) {
         const dtype = rn.data?.type;
@@ -57,6 +57,9 @@ function load(yamlStr) {
             iterStartNodes.push(rn);
             continue;
         }
+        // Skip iteration children (have parentId) — they're added in Pass 2
+        if (rn.parentId)
+            continue;
         const Ctor = nodes_1.NODE_TYPE_MAP[dtype];
         if (!Ctor) {
             console.warn(`Unknown node type: ${dtype} (id=${rn.id}), skipping`);

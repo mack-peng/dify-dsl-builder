@@ -31,53 +31,91 @@ curl -s https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/g
 
 ## CLI Commands
 
+### Inspect
+
 ```
-dify-dsl-cli <command> [options]
+dify-dsl-cli info <file>                 # node/edge counts by type
+dify-dsl-cli flow <file> [--short]       # workflow topology tree
+dify-dsl-cli find <file> <text>          # search across all node content
+dify-dsl-cli node show <file> <id>       # dump full node data
+dify-dsl-cli node show <file> <id> --json  # machine-readable JSON
+dify-dsl-cli node list <file> [type]     # tabular overview, optional type filter
+dify-dsl-cli edge list <file> [node-id]  # edge table
+dify-dsl-cli path <file> <from> <to>     # shortest path between nodes
+```
 
-Commands:
-  info       <file>              Print node/edge stats
-  flow       <file>              Print workflow topology tree (for AI agents)
-  roundtrip  <input> [output]    Parse → save, verify round-trip
-  validate   <file>              Run Ruby DSL validator (external script)
-  apply      <patch> -i <in> -o <out>  Apply YAML patch file
-  remove     <file> <id>         Remove a node
+### Verify
 
-Atomic commands (modify file in place):
-  node set-title   <file> <id> <title>
-  node set-desc    <file> <id> <desc>
-  node set-prompt  <file> <id> <role> <replace> <with>
-  edge add         <file> <src> <tgt> [handle]
-  edge remove      <file> <src> <tgt> [handle]
+```
+dify-dsl-cli diff <yml1> <yml2>          # semantic diff (nodes, edges, prompts, conditions)
+dify-dsl-cli roundtrip <in> [out]        # parse → save, verify fidelity
+dify-dsl-cli validate <file>             # Ruby DSL validator (external)
+```
+
+### Apply Patches
+
+```
+dify-dsl-cli apply <patch.yml> -i <in> -o <out>   # 19 patch operations + auto-validation
+```
+
+### Atomic Modify (in-place)
+
+```
+dify-dsl-cli remove           <file> <id>
+dify-dsl-cli node set-title    <file> <id> <title>
+dify-dsl-cli node set-desc     <file> <id> <desc>
+dify-dsl-cli node set-prompt   <file> <id> <role> <replace> <with>
+dify-dsl-cli node set-code     <file> <id> <replace> <with>
+dify-dsl-cli node set-condition <file> <id> <case_id> <field> <value>
+dify-dsl-cli edge add          <file> <src> <tgt> [handle]
+dify-dsl-cli edge remove       <file> <src> <tgt> [handle]
 ```
 
 ### Examples
 
 ```bash
-# Inspect a DSL file
-dify-dsl-cli info my-workflow.yml
+# Understand the workflow
+dify-dsl-cli flow app.yml
+dify-dsl-cli find app.yml "温度"           # find all mentions of a keyword
+dify-dsl-cli node show app.yml "llm-001"   # inspect a specific LLM node
 
 # Apply a YAML patch
-dify-dsl-cli apply my-patch.yml -i input.yml -o output.yml
+dify-dsl-cli apply my-patch.yml -i app.yml -o patched.yml
 
-# Modify a node title in place
-dify-dsl-cli node set-title workflow.yml "node-id" "新标题"
+# Quick inline modification
+dify-dsl-cli node set-title app.yml "node-42" "New Title"
+dify-dsl-cli node set-condition app.yml "if-1" "true" "value" 420
 
-# Add an edge
-dify-dsl-cli edge add workflow.yml "source-id" "target-id"
+# Verify changes
+dify-dsl-cli diff app.yml patched.yml
 ```
 
 ---
 
 ## YAML Patch System
 
-Declaratively modify Dify DSL via YAML patch files. **17 operations** — see full guide at [`docs/guide/patch.md`](docs/guide/patch.md).
+Declaratively modify Dify DSL via YAML patch files. **19 operations** — see full guide at [`docs/guide/patch.md`](docs/guide/patch.md).
 
 ```yaml
-description: 我的补丁
+description: My patch
 steps:
-  - set-title: { id: "node-1", value: "新标题" }
+  - set-title: { id: "node-1", value: "New Title" }
   - remove-node: { id: "node-old" }
   - add-edge: { source: "new-node", target: "answer-node" }
+  - set-prompt:
+      id: "llm-1"
+      role: "system"
+      replace: "old text"
+      with: "new text"
+      replaceAll: true
+  - update-condition:
+      id: "if-else-1"
+      case_id: "true"
+      field: "value"
+      value: 420
+  - remove-classifier-class:
+      classifier: "cls-1"
+      id: "deprecated-class"
 ```
 
 ---

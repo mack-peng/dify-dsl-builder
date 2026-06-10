@@ -31,8 +31,10 @@ The user provides two files:
 Your process:
 
 ```
-1. Inspect DSL  →  npx dify-dsl-cli flow <file>   (see full topology)
-                →  npx dify-dsl-cli info <file>   (see stats)
+1. Inspect DSL  →  npx dify-dsl-cli flow <file>    (topology tree)
+                →  npx dify-dsl-cli info <file>    (stats)
+                →  npx dify-dsl-cli find <file> <keyword>  (locate nodes)
+                →  npx dify-dsl-cli node show <file> <id>  (inspect node)
 2. Read requirements → analyze each item
 3. Create a technical plan → decide per-item approach
 4. Choose execution path:

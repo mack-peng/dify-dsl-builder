@@ -723,3 +723,94 @@ dsl.addNode(code);
 dsl.addEdge("upstream-id", "my-new-code");
 dsl.addEdge("my-new-code", "next-node-id", "source");
 ```
+
+---
+
+## 8. YAML Patch 系统（实现需求的首选方式）
+
+使用 YAML patch 文件声明式地修改 DSL，无需写 TypeScript 代码。**实现用户需求时，优先编写 patch 描述文件。**
+
+完整编写指南：`docs/guide/patch.md`  
+完整示例：`examples/patch-all-steps.yml`
+
+### 8.1 CLI 应用
+
+```bash
+npx tsx src/cli.ts apply <patch.yml> -i <input.yml> -o <output.yml>
+```
+
+apply 完成后自动调用 `dsl.validate()`，校验不通过则 exit code 非零。
+
+### 8.2 编程应用
+
+```ts
+import { loadPatch, applyPatch } from "dify-dsl-builder";
+const { description, steps } = loadPatch("my-patch.yml");
+const dsl = DifyDSL.parse(yamlStr);
+applyPatch(dsl, steps);
+dsl.save("output.yml");
+```
+
+### 8.3 全部操作速查（17 种）
+
+| 操作 | 用途 | 关键参数 |
+|------|------|----------|
+| `remove-edge` | 删除边 | `source`, `target`, `sourceHandle?` |
+| `add-edge` | 添加边 | `source`, `target`, `handle?` |
+| `remove-node` | 删除节点（自动清理关联边） | `id` |
+| `add-code-node` | 新增 Code 节点 | `id`, `title`, `code`, `code_language?`, `position?`, `variables?`, `outputs?` |
+| `add-classifier-class` | 给分类器新增分类 | `classifier`, `id`, `name` |
+| `set-title` | 修改节点标题 | `id`, `value` |
+| `set-desc` | 修改节点描述 | `id`, `value` |
+| `set-position` | 修改节点位置 | `id`, `x`, `y` |
+| `set-prompt` | 替换 LLM 提示词 | `id`, `role`, `replace`, `with` |
+| `set-answer` | 修改 Answer 节点模板 | `id`, `answer` |
+| `set-code` | 替换 Code 节点代码 | `id`, `replace`, `with` |
+| `set-start-var` | 修改 Start 节点变量字段 | `id`, `variable`, `field`, `value` |
+| `env-set` | 设置环境变量 | `name`, `value`, `type` |
+| `env-remove` | 删除环境变量 | `name` |
+| `conv-set` | 设置对话变量 | `name`, `value_type?` |
+
+_`remove-edge` 会自动尝试 3 种 `sourceHandle`：指定值、`"true"`、`"false"`，方便处理 if-else 分支。_
+
+### 8.4 典型示例
+
+#### 删除节点并插入新 Code 节点
+
+```yaml
+description: 用 Code 节点替换旧模板节点
+steps:
+  - remove-edge: { source: "prev", target: "old-template" }
+  - remove-edge: { source: "old-template", target: "next" }
+  - remove-node: { id: "old-template" }
+  - add-code-node:
+      id: "new-code"
+      title: "替换节点"
+      code: |
+        def main(input: str) -> dict:
+            return {"result": input}
+      position: { x: 2000, y: 500 }
+  - add-edge: { source: "prev", target: "new-code" }
+  - add-edge: { source: "new-code", target: "next" }
+```
+
+#### 批量修改提示词
+
+```yaml
+description: 统一修改多个 LLM 节点的 system prompt
+steps:
+  - set-prompt: { id: "llm-1", role: "system", replace: "旧指令", with: "新指令 v2" }
+  - set-prompt: { id: "llm-2", role: "system", replace: "旧指令", with: "新指令 v2" }
+```
+
+#### 修改节点文本 + 位置
+
+```yaml
+description: 重命名并重排节点
+steps:
+  - set-title: { id: "llm-analysis", value: "智能分析 v2" }
+  - set-desc: { id: "llm-analysis", value: "增强后的分析节点" }
+  - set-position: { id: "llm-analysis", x: 1200, y: 300 }
+```
+
+

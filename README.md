@@ -17,11 +17,14 @@ Or read the [Installation Guide](docs/guide/installation.md) yourself.
 
 ### For LLM Agents
 
-Fetch the installation guide and follow it step by step:
+Fetch the installation guide and patch guide:
 
 ```bash
 curl -s https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/guide/installation.md
+curl -s https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/guide/patch.md
 ```
+
+实现需求时优先使用 YAML Patch 系统（`docs/guide/patch.md`），编写描述文件优于直接写 TypeScript 代码。
 
 ## Quick Start
 
@@ -97,7 +100,10 @@ dsl.addNode(llm);
 
 ## YAML Patch 系统
 
-使用 YAML patch 文件声明式地修改 DSL。全部 17 种操作见 `examples/patch-all-steps.yml`。
+使用 YAML patch 文件声明式地修改 DSL。**实现需求时首选 patch 方式**——编写描述文件优于直接写 TypeScript 代码。
+
+- **编写指南**：[`docs/guide/patch.md`](docs/guide/patch.md) — 全部 17 种操作、参数说明、典型模式
+- **示例文件**：[`examples/patch-all-steps.yml`](examples/patch-all-steps.yml) — 每种操作一个例子
 
 ```yaml
 description: 我的补丁

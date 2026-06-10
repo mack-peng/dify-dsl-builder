@@ -74,7 +74,7 @@ Reads/manipulates/writes **Dify DSL YAML** (`app.yml` exported from Dify Studio)
 ## CLI behaviors
 
 - `roundtrip` / `validate` try to shell out to `dify-builder-agent/scripts/validate-dsl.rb` (external sibling repo). Errors are caught and printed, not fatal. A local copy exists at `scripts/validate-dsl.rb` but is NOT used by the CLI — it always looks for the sibling repo.
-- `apply` runs `dsl.validate()` after patching, exits non-zero on validation errors
+- `apply` runs `dsl.validate()` after patching, exits non-zero on validation errors. Validate checks: Start/Answer node existence, edge node refs, code output types, env/conv variable schema completeness (`id`+`selector`+value-type match), LLM `context`/`vision` required fields.
 - Atomic commands (`node set-title`, `edge add`, etc.) modify the file in place
 
 ## Input/output conventions

@@ -1,0 +1,105 @@
+description: "演示 patch 系统全部 15 种操作步骤"
+steps:
+  # ── 1. remove-edge: 删除一条边 ──
+  - remove-edge:
+      source: "1747500000001"
+      target: "1747000003001"
+
+  # ── 2. remove-edge: 删除带 handle 的边 ──
+  - remove-edge:
+      source: "1747500000001"
+      target: "1747000006001"
+      sourceHandle: "true"
+
+  # ── 3. add-edge: 添加一条边 ──
+  - add-edge:
+      source: "1747500000001"
+      target: "1780889576194"
+      handle: "true"
+
+  # ── 4. add-edge: 添加边（默认 source handle） ──
+  - add-edge:
+      source: "1780889576194"
+      target: "1747000003001"
+      handle: "undergrad_school"
+
+  # ── 5. add-code-node: 新增一个代码节点 ──
+  - add-code-node:
+      id: "ex-code-001"
+      title: "示例代码节点"
+      desc: "通过 patch 新增"
+      code: |
+        def main(input: str) -> dict:
+            return {"result": input.upper()}
+      code_language: python3
+      position: { x: 4200, y: 600 }
+      variables:
+        - { variable: "input", value_selector: ["1747000000001", "gaokao_score"], value_type: "number" }
+      outputs:
+        result: { type: "string" }
+
+  # ── 6. remove-node: 删除一个节点 ──
+  - remove-node:
+      id: "1782000000002"
+
+  # ── 7. set-title: 修改节点标题 ──
+  - set-title:
+      id: "1747000006001"
+      value: "【补丁修改】兴趣分析→推荐专业"
+
+  # ── 8. set-desc: 修改节点描述 ──
+  - set-desc:
+      id: "1747000006001"
+      value: "此描述已被 patch 修改"
+
+  # ── 9. set-position: 修改节点位置 ──
+  - set-position:
+      id: "1780889576194"
+      x: 730
+      y: 250
+
+  # ── 10. set-prompt: 替换 LLM 提示词中的文本 ──
+  - set-prompt:
+      id: "1747000021001"
+      role: "system"
+      replace: "你是一位资深高考志愿填报专家。请根据以下信息为用户提供专业推荐。"
+      with: "你是一位资深高考志愿填报专家，请根据以下信息提供专业推荐。重点匹配本科院校。"
+
+  # ── 11. set-answer: 修改 Answer 节点模板 ──
+  - set-answer:
+      id: "1747000024001"
+      answer: "{{#ex-code-001.result#}}"
+
+  # ── 12. add-classifier-class: 给分类器新增一个分类 ──
+  - add-classifier-class:
+      classifier: "1780889576194"
+      id: "undergrad_school"
+      name: "本科学校/专业推荐"
+
+  # ── 13. set-code: 替换代码节点中的文本 ──
+  - set-code:
+      id: "1747000003001"
+      replace: "def main"
+      with: "# PATCHED\n# This code was modified by a patch\ndef main"
+
+  # ── 14. set-start-var: 修改 Start 节点变量字段 ──
+  - set-start-var:
+      id: "1747000000001"
+      variable: "gaokao_score"
+      field: "label"
+      value: "高考总分（已修改）"
+
+  # ── 15. env-set: 设置环境变量 ──
+  - env-set:
+      name: "GAOKAO_BENKE_LINE"
+      value: 450
+      type: "number"
+
+  # ── 16. env-remove: 删除环境变量 ──
+  - env-remove:
+      name: "GAOKAO_MIN_VALID"
+
+  # ── 17. conv-set: 设置对话变量 ──
+  - conv-set:
+      name: "user_interest"
+      value_type: "string"

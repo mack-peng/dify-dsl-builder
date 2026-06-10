@@ -2,48 +2,41 @@
 
 TypeScript library for reading, manipulating, and writing [Dify](https://dify.ai) DSL YAML files (`app.yml`).
 
-## Install
+---
+
+## Installation
+
+### For Humans
+
+Copy and paste this to your LLM agent (Claude Code, Cursor, Codex, etc.):
+
+> Install and set up dify-dsl-builder by following the instructions here:
+> https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/guide/installation.md
+
+Or read the [Installation Guide](docs/guide/installation.md) yourself.
+
+### For LLM Agents
+
+Fetch the installation guide and follow it step by step:
+
+```bash
+curl -s https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/guide/installation.md
+```
+
+## Quick Start
 
 ```bash
 npm ci
 npm run build
+
+# CLI
+npx tsx src/cli.ts info input/高考志愿推荐助手.yml
+
+# Web debug
+npm run web:dev    # http://localhost:8300
 ```
 
-## CLI
-
-```bash
-# Show help
-npx tsx src/cli.ts --help
-
-# Show node/edge stats
-npx tsx src/cli.ts info input/app.yml
-
-# Roundtrip test (parse → toYAML → save)
-npx tsx src/cli.ts roundtrip input/app.yml output/roundtrip.yml
-
-# Apply a YAML patch (see examples/patch-all-steps.yml)
-npx tsx src/cli.ts apply examples/patch-all-steps.yml -i input/app.yml -o output/patched.yml
-```
-
-## Examples
-
-```bash
-# Run the TypeScript API demo
-npx tsx examples/basic-usage.ts
-
-# Apply the comprehensive patch demo to the input file
-npx tsx src/cli.ts apply examples/patch-all-steps.yml \
-  -i input/高考志愿推荐助手.yml \
-  -o output/patched.yml
-```
-
-## Web debug page
-
-```bash
-npm run web:dev     # http://localhost:8300
-```
-
-## Library API (quick start)
+## Library API
 
 ```ts
 import { DifyDSL } from "dify-dsl-builder";

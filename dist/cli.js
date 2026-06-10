@@ -43,13 +43,18 @@ const USAGE = `
 dify-dsl-cli <command> [options]
 
 Commands:
-  roundtrip <input> [output]     Load YAML → save, verify round-trip
-  validate   <file>              Run Ruby DSL validator
   info       <file>              Print node/edge stats
-  flow       <file>              Print workflow topology (tree view for agents)
+  flow       <file> [--short]    Print workflow topology (full IDs, --short for truncated)
+  find       <file> <text>       Search text across all node content
+  roundtrip  <input> [output]    Load YAML → save, verify round-trip
+  validate   <file>              Run Ruby DSL validator
   apply      <patch> -i <in> -o <out>  Apply YAML patch file
 
-Atomic commands:
+Inspect commands:
+  node show  <file> <id>         Dump full data of a single node
+  node list  <file> [type]       Tabular listing, optional type filter
+
+Atomic commands (modify file in place):
   node set-title   <file> <id> <title>
   node set-desc    <file> <id> <desc>
   node set-prompt  <file> <id> <role> <replace> <with>
@@ -118,33 +123,34 @@ function cmd_info(args) {
         console.log(`  ${t.padEnd(24)} ${c}`);
     }
 }
+const TYPE_LABEL = {
+    start: "START", llm: "LLM", code: "CODE", answer: "ANSWER",
+    "if-else": "IF", "question-classifier": "CLASS", tool: "TOOL",
+    "knowledge-retrieval": "KB", "template-transform": "TMPL",
+    "variable-aggregator": "AGGR", iteration: "ITER",
+    "http-request": "HTTP", "document-extractor": "DOC",
+};
+function nodeLabel(n, useShort) {
+    const t = TYPE_LABEL[n.data.type] || n.data.type;
+    const id = useShort ? n.id.slice(-6) : n.id;
+    return `[${t}] ${id} ${n.title || ""}`;
+}
 function cmd_flow(args) {
-    const file = resolvePath(args[0]);
+    const useShort = args.includes("--short");
+    const fileArgs = args.filter(a => a !== "--short");
+    const file = resolvePath(fileArgs[0]);
     if (!fs.existsSync(file))
         fail(`File not found: ${file}`);
     const str = fs.readFileSync(file, "utf-8");
     const dsl = DifyDSL_1.DifyDSL.parse(str);
     console.log(`# ${dsl.app.name}`);
     console.log(`Mode: ${dsl.mode} | ${dsl.nodeCount} nodes, ${dsl.edgeCount} edges\n`);
-    // Find start nodes (no incoming edges → root)
     const roots = [];
     for (const n of dsl.index.byId.values()) {
-        if (dsl.getPrevIds(n.id).length === 0 && !n.parentId) {
+        if (dsl.getPrevIds(n.id).length === 0 && !n.parentId)
             roots.push(n.id);
-        }
     }
     const visited = new Set();
-    const typeLabel = {
-        start: "START", llm: "LLM", code: "CODE", answer: "ANSWER",
-        "if-else": "IF", "question-classifier": "CLASS", tool: "TOOL",
-        "knowledge-retrieval": "KB", "template-transform": "TMPL",
-        "variable-aggregator": "AGGR", iteration: "ITER",
-        "http-request": "HTTP", "document-extractor": "DOC",
-    };
-    function label(n) {
-        const t = typeLabel[n.data.type] || n.data.type;
-        return `[${t}] ${n.id.slice(-6)} ${n.title || ""}`;
-    }
     function getBranches(id) {
         return dsl.index.getOutEdges(id).map(e => ({
             handle: e.sourceHandle,
@@ -161,27 +167,26 @@ function cmd_flow(args) {
             const childPrefix = isLeaf ? "   " : "│  ";
             if (visited.has(id)) {
                 const n = dsl.getNode(id);
-                console.log(prefix + connector + `↳ [${typeLabel[n?.data.type || "?"] || "?"}] ${id.slice(-6)} (see above)`);
+                const refId = useShort ? id.slice(-6) : id;
+                console.log(prefix + connector + `↳ [${TYPE_LABEL[n?.data.type || "?"] || "?"}] ${refId} (see above)`);
                 continue;
             }
             visited.add(id);
             const n = dsl.getNode(id);
             if (!n) {
-                console.log(prefix + connector + `? ${id.slice(-6)} (not found)`);
+                console.log(prefix + connector + `? ${id} (not found)`);
                 continue;
             }
             const branches = getBranches(id);
             if (branches.length === 0) {
-                console.log(prefix + connector + label(n));
+                console.log(prefix + connector + nodeLabel(n, useShort));
             }
             else if (branches.length === 1) {
-                const b = branches[0];
-                console.log(prefix + connector + label(n));
-                tree(b.target, prefix + childPrefix, [...isLast, last]);
+                console.log(prefix + connector + nodeLabel(n, useShort));
+                tree(branches[0].target, prefix + childPrefix, [...isLast, last]);
             }
             else {
-                // Branching node — show node then each branch
-                console.log(prefix + connector + label(n));
+                console.log(prefix + connector + nodeLabel(n, useShort));
                 for (let j = 0; j < branches.length; j++) {
                     const b = branches[j];
                     const bLast = j === branches.length - 1;
@@ -196,19 +201,314 @@ function cmd_flow(args) {
     for (const rootId of roots) {
         tree(rootId, "", [true]);
     }
-    // Summarize iteration containers
     if (dsl.index.byParent.size > 0) {
         console.log("\n## Iterations");
         for (const [parentId, childIds] of dsl.index.byParent) {
             const parent = dsl.getNode(parentId);
             if (parent?.data.type === "iteration") {
-                console.log(`\n${label(parent)}`);
+                console.log(`\n${nodeLabel(parent, useShort)}`);
                 for (const cid of childIds) {
                     const c = dsl.getNode(cid);
-                    console.log(`  - ${label(c)}`);
+                    console.log(`  - ${nodeLabel(c, useShort)}`);
                 }
             }
         }
+    }
+}
+// ── node show ──
+function cmdNodeShow(args) {
+    const file = resolvePath(args[0]);
+    const id = args[1];
+    if (!fs.existsSync(file))
+        fail(`File not found: ${file}`);
+    if (!id)
+        fail("Usage: dify-dsl-cli node show <file> <id>");
+    const str = fs.readFileSync(file, "utf-8");
+    const dsl = DifyDSL_1.DifyDSL.parse(str);
+    const n = dsl.getNode(id);
+    if (!n)
+        fail(`Node not found: ${id}`);
+    const data = n.data;
+    const type = data.type;
+    console.log(`=== ${n.id} ===`);
+    console.log(`Type:     ${type}`);
+    console.log(`Title:    ${data.title || "(none)"}`);
+    console.log(`Desc:     ${data.desc || "(none)"}`);
+    console.log(`Position: x=${n.position.x} y=${n.position.y} (${n.width}×${n.height})`);
+    if (n.parentId)
+        console.log(`Parent:   ${n.parentId}`);
+    if (n.isInIteration)
+        console.log(`InIter:   ${n.iterationId}`);
+    const prevIds = dsl.getPrevIds(id);
+    const nextIds = dsl.getNextIds(id);
+    if (prevIds.length > 0) {
+        console.log(`Upstream: ${prevIds.map(pid => {
+            const pn = dsl.getNode(pid);
+            return `${pid} [${pn?.data.type || "?"}] ${pn?.title || ""}`;
+        }).join(", ")}`);
+    }
+    if (nextIds.length > 0) {
+        console.log(`Downstr:  ${nextIds.map(nid => {
+            const nn = dsl.getNode(nid);
+            return `${nid} [${nn?.data.type || "?"}] ${nn?.title || ""}`;
+        }).join(", ")}`);
+    }
+    switch (type) {
+        case "llm": {
+            console.log(`\n-- Model --`);
+            console.log(`Provider: ${data.model.provider}`);
+            console.log(`Model:    ${data.model.name} | ${data.model.mode}`);
+            console.log(`Params:   ${JSON.stringify(data.model.completion_params)}`);
+            console.log(`\n-- Prompts --`);
+            for (const msg of data.prompt_template || []) {
+                const preview = msg.text.length > 500 ? msg.text.slice(0, 500) + "..." : msg.text;
+                console.log(`  [${msg.role}] (${msg.text.length} chars)`);
+                console.log("  " + preview.replace(/\n/g, "\n  "));
+                console.log();
+            }
+            console.log(`Context:  enabled=${data.context?.enabled || false}`);
+            console.log(`Vision:   enabled=${data.vision?.enabled || false}`);
+            if (data.memory?.window?.enabled) {
+                console.log(`Memory:   window=${data.memory.window.size} enabled`);
+            }
+            else {
+                console.log(`Memory:   disabled`);
+            }
+            break;
+        }
+        case "code": {
+            console.log(`\n-- Code (${data.code_language}) --`);
+            console.log(data.code);
+            if (data.variables?.length) {
+                console.log(`\n-- Inputs --`);
+                for (const v of data.variables) {
+                    console.log(`  ${v.variable}: ${(v.value_selector || []).join(".")} (${v.value_type || "?"})`);
+                }
+            }
+            if (data.outputs) {
+                console.log(`\n-- Outputs --`);
+                for (const [name, out] of Object.entries(data.outputs)) {
+                    console.log(`  ${name}: ${out.type}`);
+                }
+            }
+            break;
+        }
+        case "if-else": {
+            console.log(`\n-- Conditions --`);
+            for (const cs of data.cases || []) {
+                console.log(`  case: ${cs.case_id} (${cs.logical_operator})`);
+                for (const c of cs.conditions || []) {
+                    const sel = (c.variable_selector || []).join(".");
+                    console.log(`    ${sel} ${c.comparison_operator} ${c.value} [${c.varType}]`);
+                }
+            }
+            break;
+        }
+        case "question-classifier": {
+            console.log(`\n-- Query --`);
+            console.log(`  selector: ${(data.query_variable_selector || []).join(".")}`);
+            console.log(`\n-- Classes (${(data.classes || []).length}) --`);
+            for (const c of data.classes || []) {
+                console.log(`  ${c.id}: ${c.name}`);
+            }
+            break;
+        }
+        case "start": {
+            console.log(`\n-- Variables (${(data.variables || []).length}) --`);
+            for (const v of data.variables || []) {
+                console.log(`  ${v.variable}: ${v.type} required=${v.required} label=${v.label}`);
+                if (v.options?.length)
+                    console.log(`    options: [${v.options.join(", ")}]`);
+                if (v.placeholder)
+                    console.log(`    placeholder: ${v.placeholder}`);
+            }
+            break;
+        }
+        case "answer": {
+            const ans = (data.answer || "").slice(0, 300);
+            console.log(`\n-- Template (${data.answer?.length || 0} chars) --`);
+            console.log(`  ${ans}${data.answer?.length > 300 ? "..." : ""}`);
+            if (data.variables?.length) {
+                console.log(`\n-- Variable Refs --`);
+                for (const v of data.variables) {
+                    console.log(`  ${v.variable}: ${(v.value_selector || []).join(".")}`);
+                }
+            }
+            break;
+        }
+        case "knowledge-retrieval": {
+            console.log(`\n-- Config --`);
+            console.log(`  query: ${(data.query_variable_selector || []).join(".")}`);
+            console.log(`  mode: ${data.retrieval_mode}`);
+            console.log(`  datasets: ${data.dataset_ids?.join(", ") || "none"}`);
+            if (data.multiple_retrieval_config) {
+                const mc = data.multiple_retrieval_config;
+                console.log(`  top_k=${mc.top_k} score_threshold=${mc.score_threshold} reranking=${mc.reranking_enable}`);
+            }
+            break;
+        }
+        case "tool": {
+            console.log(`\n-- Plugin --`);
+            console.log(`  name: ${data.tool_name} v${data.tool_node_version}`);
+            console.log(`  plugin: ${data.plugin_id} | ${data.provider_type}`);
+            if (data.tool_parameters) {
+                console.log(`\n-- Parameters --`);
+                for (const [k, v] of Object.entries(data.tool_parameters)) {
+                    console.log(`  ${k}: [${v.type}] ${typeof v.value === "string" ? v.value.slice(0, 80) : v.value}`);
+                }
+            }
+            break;
+        }
+        case "iteration": {
+            console.log(`\n-- Config --`);
+            console.log(`  iterator: ${(data.iterator_selector || []).join(".")} → ${data.iterator_input_type}`);
+            console.log(`  output:   ${(data.output_selector || []).join(".")} → ${data.output_type}`);
+            console.log(`  start_id: ${data.start_node_id} | parallel=${data.is_parallel} nums=${data.parallel_nums}`);
+            const children = dsl.index.getChildren(id);
+            if (children.length > 0) {
+                console.log(`\n-- Children (${children.length}) --`);
+                for (const c of children) {
+                    console.log(`  ${c.id} [${c.data.type}] ${c.title || ""}`);
+                }
+            }
+            break;
+        }
+        case "template-transform": {
+            console.log(`\n-- Template --`);
+            console.log(`  ${data.template}`);
+            if (data.variables?.length) {
+                console.log(`\n-- Inputs --`);
+                for (const v of data.variables) {
+                    console.log(`  ${v.variable}: ${(v.value_selector || []).join(".")}`);
+                }
+            }
+            break;
+        }
+        case "variable-aggregator": {
+            console.log(`\n-- Config --`);
+            console.log(`  output_type: ${data.output_type}`);
+            console.log(`\n-- Sources (${(data.variables || []).length}) --`);
+            for (const v of data.variables || []) {
+                if (Array.isArray(v)) {
+                    console.log(`  [${v[0]}, ${v[1]}]`);
+                }
+                else {
+                    console.log(`  ${JSON.stringify(v)}`);
+                }
+            }
+            break;
+        }
+        case "http-request": {
+            console.log(`\n-- Request --`);
+            console.log(`  method: ${data.method}`);
+            console.log(`  url: ${data.url}`);
+            console.log(`  auth: ${data.authorization?.type || "none"}`);
+            console.log(`  body: ${data.body?.type || "none"}`);
+            if (data.body?.type !== "none")
+                console.log(`  body data: ${data.body?.data?.slice(0, 200) || ""}`);
+            break;
+        }
+        case "document-extractor": {
+            console.log(`\n-- Config --`);
+            console.log(`  selector: ${(data.variable_selector || []).join(".")}`);
+            console.log(`  array_file: ${data.is_array_file || false}`);
+            break;
+        }
+    }
+    const edges = dsl.getNodeEdges(id);
+    if (edges.length > 0) {
+        console.log(`\n-- Edges (${edges.length}) --`);
+        for (const e of edges) {
+            const dir = e.source === id ? "→" : "←";
+            const otherId = e.source === id ? e.target : e.source;
+            const other = dsl.getNode(otherId);
+            console.log(`  ${dir} ${otherId} [${other?.data.type || "?"}] ${other?.title || ""}`);
+        }
+    }
+}
+// ── node list ──
+function cmdNodeList(args) {
+    const file = resolvePath(args[0]);
+    const filterType = args[1];
+    if (!fs.existsSync(file))
+        fail(`File not found: ${file}`);
+    const str = fs.readFileSync(file, "utf-8");
+    const dsl = DifyDSL_1.DifyDSL.parse(str);
+    const nodes = filterType
+        ? dsl.findByType(filterType)
+        : [...dsl.index.byId.values()];
+    if (nodes.length === 0) {
+        console.log("No nodes found.");
+        return;
+    }
+    console.log(`${"ID".padEnd(16)} ${"Type".padEnd(23)} ${"Title".padEnd(22)} Up Dn`);
+    console.log("-".repeat(72));
+    for (const n of nodes) {
+        const prev = dsl.getPrevIds(n.id).length;
+        const next = dsl.getNextIds(n.id).length;
+        const title = (n.title || "").slice(0, 20);
+        console.log(`${n.id.padEnd(16)} ${n.data.type.padEnd(23)} ${title.padEnd(22)} ${String(prev).padStart(2)} ${String(next).padStart(2)}`);
+    }
+    console.log(`\n${nodes.length} nodes${filterType ? ` (filtered: ${filterType})` : ""}`);
+}
+// ── find ──
+function cmdFind(args) {
+    const file = resolvePath(args[0]);
+    const query = args.slice(1).join(" ");
+    if (!fs.existsSync(file))
+        fail(`File not found: ${file}`);
+    if (!query)
+        fail("Usage: dify-dsl-cli find <file> <text>");
+    const str = fs.readFileSync(file, "utf-8");
+    const dsl = DifyDSL_1.DifyDSL.parse(str);
+    const matches = [];
+    for (const n of dsl.index.byId.values()) {
+        const d = n.data;
+        function check(field, text) {
+            if (!text)
+                return;
+            const idx = text.toLowerCase().indexOf(query.toLowerCase());
+            if (idx < 0)
+                return;
+            const start = Math.max(0, idx - 20);
+            const end = Math.min(text.length, idx + query.length + 30);
+            matches.push({
+                id: n.id, type: n.data.type, title: n.title || "",
+                field,
+                preview: (start > 0 ? "…" : "") + text.slice(start, end).replace(/\n/g, "↵") + (end < text.length ? "…" : ""),
+            });
+        }
+        check("title", d.title);
+        check("desc", d.desc);
+        if (d.type === "llm") {
+            for (const msg of d.prompt_template || []) {
+                check(`prompt[${msg.role}]`, msg.text);
+            }
+        }
+        if (d.type === "code")
+            check("code", d.code);
+        if (d.type === "answer")
+            check("answer", d.answer);
+        if (d.type === "template-transform")
+            check("template", d.template);
+        if (d.type === "start") {
+            for (const v of d.variables || []) {
+                if (v.label)
+                    check("variable.label", v.label);
+                if (v.placeholder)
+                    check("variable.placeholder", v.placeholder);
+            }
+        }
+    }
+    if (matches.length === 0) {
+        console.log(`No matches for "${query}"`);
+        return;
+    }
+    console.log(`"${query}" — ${matches.length} matches:\n`);
+    for (const m of matches) {
+        console.log(`${m.id} [${m.type}] ${m.title}`);
+        console.log(`  ${m.field}: ${m.preview}`);
+        console.log();
     }
 }
 function cmd_apply(patchFile, input, output) {
@@ -333,13 +633,17 @@ async function main() {
             break;
         case "flow":
             if (args.length < 1)
-                fail("Usage: dify-dsl-cli flow <file>");
+                fail("Usage: dify-dsl-cli flow <file> [--short]");
             cmd_flow(args);
+            break;
+        case "find":
+            if (args.length < 2)
+                fail("Usage: dify-dsl-cli find <file> <text>");
+            cmdFind(args);
             break;
         case "apply":
             if (args.length < 1)
                 fail("Usage: dify-dsl-cli apply <patch.yml> -i <input> -o <output>");
-            // Parse -i and -o flags from args
             {
                 const patchFile = resolvePath(args[0]);
                 let input = "", output = "";
@@ -357,7 +661,17 @@ async function main() {
         case "node":
             if (args.length < 1)
                 fail("Usage: dify-dsl-cli node <subcommand> ...");
-            if (args[0] === "set-title") {
+            if (args[0] === "show") {
+                if (args.length < 3)
+                    fail("Usage: dify-dsl-cli node show <file> <id>");
+                cmdNodeShow(args.slice(1));
+            }
+            else if (args[0] === "list") {
+                if (args.length < 2)
+                    fail("Usage: dify-dsl-cli node list <file> [type]");
+                cmdNodeList(args.slice(1));
+            }
+            else if (args[0] === "set-title") {
                 if (args.length < 3)
                     fail("Usage: dify-dsl-cli node set-title <file> <id> <title>");
                 atomNodeSetTitle(args.slice(1));

@@ -20,7 +20,7 @@ After `npm run build`, the CLI is available as `dify-dsl-cli` (`package.json#bin
 ## Web debug page
 
 ```
-npm run web:dev     # webpack dev server at http://localhost:3000
+npm run web:dev     # webpack dev server at http://localhost:8300
 npm run web:build   # production bundle → dist-web/
 ```
 

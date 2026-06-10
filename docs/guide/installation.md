@@ -11,7 +11,7 @@ git clone <repo-url>
 cd dify-dsl-builder
 npm ci
 npm run build          # tsc → dist/
-npm run web:dev        # (可选) 启动 webpack dev server :3000
+npm run web:dev        # (可选) 启动 webpack dev server :8300
 ```
 
 CLI 命令：

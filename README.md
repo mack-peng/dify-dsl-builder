@@ -13,16 +13,34 @@ npm run build
 
 ```bash
 # Show help
-npm run run src/cli.ts --help
+npx tsx src/cli.ts --help
 
 # Show node/edge stats
-npm run run src/cli.ts info input/app.yml
+npx tsx src/cli.ts info input/app.yml
 
 # Roundtrip test (parse → toYAML → save)
-npm run run src/cli.ts roundtrip input/app.yml output/roundtrip.yml
+npx tsx src/cli.ts roundtrip input/app.yml output/roundtrip.yml
 
-# Apply a YAML patch
-npm run run src/cli.ts apply patches/gaokao-v3.yml -i input/app.yml -o output/patched.yml
+# Apply a YAML patch (see examples/patch-all-steps.yml)
+npx tsx src/cli.ts apply examples/patch-all-steps.yml -i input/app.yml -o output/patched.yml
+```
+
+## Examples
+
+```bash
+# Run the TypeScript API demo
+npx tsx examples/basic-usage.ts
+
+# Apply the comprehensive patch demo to the input file
+npx tsx src/cli.ts apply examples/patch-all-steps.yml \
+  -i input/高考志愿推荐助手.yml \
+  -o output/patched.yml
+```
+
+## Web debug page
+
+```bash
+npm run web:dev     # http://localhost:8300
 ```
 
 ## Library API (quick start)
@@ -55,16 +73,24 @@ const yaml = dsl.toYAML();    // yaml.dump → string
 fs.writeFileSync("output.yml", yaml);
 ```
 
-## Patch files
+## YAML Patch 系统
 
-Declarative YAML patches with a `steps:` array. See `patches/` for examples.
+使用 YAML patch 文件声明式地修改 DSL。全部 17 种操作见 `examples/patch-all-steps.yml`。
 
 ```yaml
-description: My patch
+description: 我的补丁
 steps:
-  - set-title: { id: "node-1", value: "New Title" }
+  - set-title: { id: "node-1", value: "新标题" }
   - remove-node: { id: "node-old" }
   - add-edge: { source: "new-node", target: "answer-node" }
+```
+
+应用：
+
+```bash
+npx tsx src/cli.ts apply examples/patch-all-steps.yml \
+  -i input/高考志愿推荐助手.yml \
+  -o output/patched.yml
 ```
 
 ## Node types

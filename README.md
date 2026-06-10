@@ -7,7 +7,7 @@ CLI tool and TypeScript library for reading, manipulating, and writing [Dify](ht
 ## Installation
 
 ```bash
-npm install -g dify-dsl-builder
+npm install -g @orangemust/dify-dsl-builder
 ```
 
 Or use via npx without installing:
@@ -84,7 +84,7 @@ steps:
 ## Library API
 
 ```ts
-import { DifyDSL } from "dify-dsl-builder";
+import { DifyDSL } from "@orangemust/dify-dsl-builder";
 import * as fs from "fs";
 
 const dsl = DifyDSL.parse(fs.readFileSync("app.yml", "utf-8"));

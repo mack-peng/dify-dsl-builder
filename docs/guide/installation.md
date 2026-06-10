@@ -1,6 +1,6 @@
 # Dify DSL Builder — Installation & API Reference
 
-面向 AI Agent / 开发者，描述 `dify-dsl-builder` 库的安装、CLI 用法、核心 API 和 Patch 系统。
+面向 AI Agent / 开发者，描述 `@orangemust/dify-dsl-builder` 库的安装、CLI 用法、核心 API 和 Patch 系统。
 
 ---
 
@@ -9,7 +9,7 @@
 ### 方式一：npm 全局安装（推荐用于 CLI）
 
 ```bash
-npm install -g dify-dsl-builder
+npm install -g @orangemust/dify-dsl-builder
 dify-dsl-cli info my-workflow.yml
 ```
 
@@ -31,11 +31,11 @@ npm run build          # tsc → dist/
 ### 方式四：作为库依赖
 
 ```bash
-npm install dify-dsl-builder
+npm install @orangemust/dify-dsl-builder
 ```
 
 ```ts
-import { DifyDSL, CodeNode } from "dify-dsl-builder";
+import { DifyDSL, CodeNode } from "@orangemust/dify-dsl-builder";
 ```
 
 ---
@@ -43,7 +43,7 @@ import { DifyDSL, CodeNode } from "dify-dsl-builder";
 ## 2. 核心类：`DifyDSL`
 
 路径：`src/core/DifyDSL.ts`  
-导出：`import { DifyDSL } from "dify-dsl-builder";`
+导出：`import { DifyDSL } from "@orangemust/dify-dsl-builder";`
 
 ### 2.1 解析
 

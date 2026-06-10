@@ -1,5 +1,5 @@
 {
-  "name": "dify-dsl-builder",
+  "name": "@orangemust/dify-dsl-builder",
   "version": "1.0.0",
   "description": "CLI tool and TypeScript library for reading, manipulating, and writing Dify DSL YAML files",
   "main": "dist/index.js",

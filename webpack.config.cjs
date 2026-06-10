@@ -43,7 +43,7 @@ module.exports = {
   ],
   devServer: {
     static: path.resolve(__dirname, "dist-web"),
-    port: 3000,
+    port: 8300,
     hot: true,
     setupMiddlewares(middlewares, devServer) {
       const app = devServer.app;

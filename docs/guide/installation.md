@@ -172,9 +172,278 @@ abstract class BaseNode<T extends NodeData> {
 
 ---
 
-## 4. 各 Node 子类的方法
+## 4. 节点创建
+
+所有节点构造器都用同一模式：`new XxxNode(id, data?)`，其中 `data` 是类型化的 Partial 数据对象。构造后通过 `dsl.addNode(node)` 添加到 DSL。
+
+```ts
+import {
+  StartNode, AnswerNode, LLMNode, CodeNode,
+  KnowledgeNode, IfElseNode, TemplateNode, AggregatorNode,
+  IterationNode, IterationStartNode, ToolNode, ClassifierNode,
+} from "dify-dsl-builder";
+```
 
 ### 4.1 `StartNode`
+
+```ts
+new StartNode("id-001", {
+  title: "开始",
+  desc: "收集用户信息",
+  variables: [
+    {
+      variable: "user_name",            // 变量名，在 prompt 中用 {{#node_id.user_name#}} 引用
+      label: "姓名",
+      type: "text-input",               // text-input | paragraph | select | number | url | files | file | file-list | json | json_object | checkbox
+      required: true,
+      max_length: 100,                  // 可选
+      options: [],                      // select 类型时填选项列表
+      placeholder: "请输入姓名",         // 可选
+      default: "",                      // 可选
+    },
+  ],
+});
+```
+
+### 4.2 `AnswerNode`
+
+```ts
+new AnswerNode("id-002", {
+  title: "回答",
+  desc: "输出推荐报告",
+  answer: "{{#llm-node.text#}}",        // Jinja2 模板
+  variables: [                          // 必须匹配 answer 中所有引用
+    { variable: "llm-node.text", value_selector: ["llm-node", "text"], value_type: "string" },
+  ],
+});
+```
+
+### 4.3 `LLMNode`
+
+```ts
+new LLMNode("id-003", {
+  title: "智能分析",
+  desc: "生成推荐",
+  model: {
+    provider: "langgenius/deepseek/deepseek",
+    name: "deepseek-chat",              // 模型名
+    mode: "chat",                       // chat | completion
+    completion_params: { temperature: 0.3 },
+  },
+  prompt_template: [
+    { role: "system", text: "你是一位高考志愿专家。", id: "prompt-01" },
+    { role: "user", text: "请根据信息推荐。", id: "prompt-02" },
+  ],
+  context: { enabled: false, variable_selector: [] },
+  vision: { enabled: false },
+  memory: {                             // advanced-chat 模式可选
+    window: { enabled: true, size: 10 },
+    query_prompt_template: "{{#sys.query#}}",
+  },
+  prompt_config: {                      // 可选
+    jinja2_variables: [],
+  },
+});
+```
+
+### 4.4 `CodeNode`
+
+```ts
+new CodeNode("id-004", {
+  title: "处理数据",
+  desc: "格式化结果",
+  code_language: "python3",             // python3 | javascript
+  code: `def main(input: str) -> dict:\n    return {"result": input.upper()}`,
+  variables: [
+    { variable: "input", value_selector: ["upstream-id", "text"], value_type: "string" },
+  ],
+  outputs: {                             // 每个输出的类型声明
+    result: { type: "string", children: null },
+  },
+});
+```
+
+### 4.5 `KnowledgeNode`
+
+```ts
+new KnowledgeNode("id-005", {
+  title: "知识库搜索",
+  desc: "用分数范围搜索大学专业",
+  dataset_ids: ["uuid-of-dataset"],    // 知识库 UUID 数组
+  query_variable_selector: ["upstream-id", "search_query"],
+  retrieval_mode: "multiple",           // single | multiple
+  multiple_retrieval_config: {          // multiple 模式必填
+    top_k: 8,
+    score_threshold: 0.5,
+    reranking_enable: false,
+  },
+});
+```
+
+### 4.6 `IfElseNode`
+
+```ts
+new IfElseNode("id-006", {
+  title: "分数分流",
+  desc: ">=450走本科",
+  cases: [
+    {
+      case_id: "true",
+      id: "true",
+      logical_operator: "and",
+      conditions: [
+        {
+          id: "cond-1",
+          variable_selector: ["start-id", "score"],
+          comparison_operator: "≥",     // contains | not contains | start with | end with | is | is not | empty | not empty | = | != | > | < | >= | <= | in | not in | null | not null
+          value: "450",
+          varType: "number",
+        },
+      ],
+    },
+  ],
+});
+```
+
+### 4.7 `TemplateNode`
+
+```ts
+new TemplateNode("id-007", {
+  title: "构建查询",
+  desc: "用当前 item 构建搜索词",
+  template: "{{ item }}",              // Jinja2 模板
+  variables: [
+    { variable: "item", value_selector: ["iteration-id", "item"], value_type: "string" },
+  ],
+});
+```
+
+### 4.8 `AggregatorNode`
+
+```ts
+new AggregatorNode("id-008", {
+  title: "合并结果",
+  desc: "合并多路 KB 搜索结果",
+  output_type: "array",                // 必须匹配所有 source 的输出类型
+  variables: [                         // 注意：是裸嵌套数组，非对象列表
+    ["node-1", "result"],
+    ["node-2", "result"],
+  ],
+});
+```
+
+### 4.9 `IterationNode`
+
+```ts
+// 外层迭代容器
+const iter = new IterationNode("iter-001", {
+  title: "迭代专业搜索",
+  desc: "逐专业搜索知识库",
+  iterator_selector: ["code-node", "majors"],
+  iterator_input_type: "array[string]",
+  output_selector: ["kb-node", "result"],
+  output_type: "array[object]",
+  start_node_id: "iter-001-start",      // 必须和内部 iteration-start 节点 ID 一致
+  is_parallel: true,
+  parallel_nums: 3,
+  error_handle_mode: "terminated",
+  width: 650,
+  height: 250,
+});
+
+// 内部 iteration-start 节点
+const iterStart = new IterationStartNode("iter-001", {
+  title: "",
+  desc: "",
+});
+
+// 内部子节点（通过 addChild 添加，自动设置 parentId/isInIteration/iterationId）
+import { TemplateNode, KnowledgeNode, CodeNode } from "dify-dsl-builder";
+const tpl = new TemplateNode("inner-tpl", { template: "{{ item }}", ... });
+const kb = new KnowledgeNode("inner-kb", { dataset_ids: [...], ... });
+
+iter.addChild(tpl);
+iter.addChild(kb);
+iter.startNode = iterStart;
+
+// 添加到 DSL
+dsl.addNode(iter);   // 自动将子节点加入索引
+```
+
+### 4.10 `ToolNode`
+
+```ts
+new ToolNode("id-009", {
+  title: "网络搜索",
+  desc: "百度智能搜索",
+  tool_name: "smart_search",
+  tool_label: "智能搜索生成",
+  tool_description: "提供AI增强的智能语义搜索工具",
+  plugin_id: "qianfan/baidu_ai_search",
+  plugin_unique_identifier: "qianfan/baidu_ai_search:0.0.1@97821ba294ff49a4d7fabb6746bfd7993373e27c2a110efd684865bf21f2ff6e",
+  provider_id: "qianfan/baidu_ai_search/baidu_ai_search",
+  provider_name: "qianfan/baidu_ai_search/baidu_ai_search",
+  provider_type: "builtin",
+  provider_icon: "/console/api/workspaces/current/plugin/icon?...",
+  is_team_authorization: true,
+  tool_node_version: "2",
+  paramSchemas: [
+    {
+      name: "query",
+      type: "string",
+      form: "llm",
+      required: true,
+      label: { zh_Hans: "搜索查询", en_US: "Search query" },
+      human_description: { zh_Hans: "搜索查询关键词或短语", en_US: "Search query keywords or phrases." },
+      llm_description: "",
+      auto_generate: null, default: null, max: null, min: null,
+      options: [], placeholder: null, precision: null, scope: null, template: null,
+    },
+  ],
+  params: { query: "", model: "", temperature: "", top_p: "", resource_type_filter: "" },
+  tool_parameters: {
+    query: { type: "mixed", value: "{{#upstream-id.search_query#}}" },
+    model: { type: "mixed", value: "" },
+    temperature: { type: "constant", value: 0.8 },
+    top_p: { type: "constant", value: 0.8 },
+    resource_type_filter: { type: "constant", value: '[{"type":"web","top_k":10}]' },
+  },
+  tool_configurations: {},
+});
+```
+
+### 4.11 `ClassifierNode`
+
+```ts
+new ClassifierNode("id-010", {
+  title: "意图分类",
+  desc: "路由到专科处理路线",
+  query_variable_selector: ["sys", "query"],
+  model: { provider: "langgenius/deepseek/deepseek", name: "deepseek-chat", mode: "chat", completion_params: { temperature: 0 } },
+  classes: [
+    { id: "school_recommend", name: "学校推荐", description: "要求推荐学校或专业" },
+    { id: "career_prospect", name: "就业前景", description: "询问就业率" },
+  ],
+  instructions: "",                     // 可选
+});
+```
+
+### 4.12 `IterationStartNode`（迭代内部起点）
+
+```ts
+new IterationStartNode("parent-iteration-id", {
+  title: "",
+  desc: "",
+});
+```
+
+注意：`IterationStartNode` 的 ID 自动由父迭代 ID + `-start` 拼接而成。构造后手动设为 `iter.startNode = iterStart`。
+
+---
+
+## 5. 各 Node 子类的方法
+
+### 5.1 `StartNode`
 
 ```ts
 .addVariable({ variable, label, type, required, options, placeholder })
@@ -183,7 +452,7 @@ abstract class BaseNode<T extends NodeData> {
 .variables   // getter → StartVariable[]
 ```
 
-### 4.2 `AnswerNode`
+### 5.2 `AnswerNode`
 
 ```ts
 .setAnswer(template)
@@ -193,7 +462,7 @@ abstract class BaseNode<T extends NodeData> {
 .answerVariables // getter
 ```
 
-### 4.3 `LLMNode`
+### 5.3 `LLMNode`
 
 ```ts
 .setModel(provider, name)
@@ -208,7 +477,7 @@ abstract class BaseNode<T extends NodeData> {
 .hasMemory       // boolean
 ```
 
-### 4.4 `CodeNode`
+### 5.4 `CodeNode`
 
 ```ts
 .setCode(lang, code)
@@ -222,7 +491,7 @@ abstract class BaseNode<T extends NodeData> {
 .outputDefs    // getter
 ```
 
-### 4.5 `KnowledgeNode`
+### 5.5 `KnowledgeNode`
 
 ```ts
 .addDataset(id)
@@ -231,7 +500,7 @@ abstract class BaseNode<T extends NodeData> {
 .setTopK(n)
 ```
 
-### 4.6 `IfElseNode`
+### 5.6 `IfElseNode`
 
 ```ts
 .addCase(c)
@@ -240,7 +509,7 @@ abstract class BaseNode<T extends NodeData> {
 .cases  // getter
 ```
 
-### 4.7 `TemplateNode`
+### 5.7 `TemplateNode`
 
 ```ts
 .setTemplate(tpl)
@@ -249,7 +518,7 @@ abstract class BaseNode<T extends NodeData> {
 .template  // getter
 ```
 
-### 4.8 `AggregatorNode`
+### 5.8 `AggregatorNode`
 
 ```ts
 .addSource(nodeId, field)
@@ -258,7 +527,7 @@ abstract class BaseNode<T extends NodeData> {
 .sources  // getter
 ```
 
-### 4.9 `IterationNode`
+### 5.9 `IterationNode`
 
 ```ts
 .addChild(node)
@@ -270,7 +539,7 @@ abstract class BaseNode<T extends NodeData> {
 .startNode // IterationStartNode | null
 ```
 
-### 4.10 `ToolNode`
+### 5.10 `ToolNode`
 
 ```ts
 .setPlugin(pluginId, uniqueId)
@@ -278,7 +547,7 @@ abstract class BaseNode<T extends NodeData> {
 .setToolConfig(key, value)
 ```
 
-### 4.11 `ClassifierNode`
+### 5.11 `ClassifierNode`
 
 ```ts
 .addClass({ id, name, description })
@@ -289,7 +558,7 @@ abstract class BaseNode<T extends NodeData> {
 
 ---
 
-## 5. 类型定义
+## 6. 类型定义
 
 ### `NodeData` — 所有节点 data 块基类
 
@@ -350,9 +619,9 @@ interface AppMeta {
 
 ---
 
-## 6. 典型使用模式
+## 7. 典型使用模式
 
-### 6.1 加载并检查
+### 7.1 加载并检查
 
 ```ts
 const dsl = DifyDSL.parse(fs.readFileSync("app.yml", "utf-8"));
@@ -366,7 +635,7 @@ console.log("上游:", dsl.getPrevIds(id));
 console.log("下游:", dsl.getNextIds(id));
 ```
 
-### 6.2 修改节点后输出
+### 7.2 修改节点后输出
 
 ```ts
 const dsl = DifyDSL.parse(yamlStr);
@@ -381,7 +650,7 @@ const outYaml = dsl.toYAML();
 fs.writeFileSync("output.yml", outYaml);
 ```
 
-### 6.3 删除节点并重新接线
+### 7.3 删除节点并重新接线
 
 ```ts
 const toRemove = "1782000000002";
@@ -395,7 +664,7 @@ dsl.removeNode(toRemove);  // 自动清理边
 dsl.addEdge("1747000003001", next[0]);
 ```
 
-### 6.4 添加一个 Code 节点
+### 7.4 添加一个 Code 节点
 
 ```ts
 import { CodeNode } from "dify-dsl-builder";

@@ -73,6 +73,35 @@ const yaml = dsl.toYAML();    // yaml.dump → string
 fs.writeFileSync("output.yml", yaml);
 ```
 
+## 节点创建
+
+所有节点构造器都是 `new XxxNode(id, data?)`，构造后用 `dsl.addNode(node)` 添加到 DSL。
+完整构造参数见 `docs/guide/installation.md#4-节点创建`。
+
+```ts
+import { CodeNode, LLMNode, StartNode, AnswerNode } from "dify-dsl-builder";
+
+// Code 节点
+const code = new CodeNode("my-code", {
+  title: "处理数据",
+  code: `def main(x: str) -> dict:\n  return {"r": x}`,
+  code_language: "python3",
+  variables: [{ variable: "x", value_selector: ["upstream", "text"] }],
+});
+code.addOutput("r", "string");
+dsl.addNode(code);
+
+// LLM 节点
+const llm = new LLMNode("my-llm", {
+  title: "智能分析",
+  model: { provider: "openai", name: "gpt-4o", mode: "chat", completion_params: {} },
+  prompt_template: [{ role: "system", text: "You are helpful." }],
+  context: { enabled: false, variable_selector: [] },
+  vision: { enabled: false },
+});
+dsl.addNode(llm);
+```
+
 ## YAML Patch 系统
 
 使用 YAML patch 文件声明式地修改 DSL。全部 17 种操作见 `examples/patch-all-steps.yml`。

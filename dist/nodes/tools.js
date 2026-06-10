@@ -189,7 +189,16 @@ class HTTPNode extends base_1.BaseNode {
     }
     static fromYAML(raw) {
         const d = raw.data;
-        return new HTTPNode(raw.id, { title: d.title, desc: d.desc });
+        return new HTTPNode(raw.id, {
+            title: d.title, desc: d.desc,
+            method: d.method,
+            url: d.url,
+            authorization: d.authorization,
+            headers: d.headers,
+            params: d.params,
+            body: d.body,
+            timeout: d.timeout,
+        });
     }
 }
 exports.HTTPNode = HTTPNode;
@@ -209,7 +218,11 @@ class DocNode extends base_1.BaseNode {
     }
     static fromYAML(raw) {
         const d = raw.data;
-        return new DocNode(raw.id, { title: d.title, desc: d.desc });
+        return new DocNode(raw.id, {
+            title: d.title, desc: d.desc,
+            variable_selector: d.variable_selector,
+            is_array_file: d.is_array_file,
+        });
     }
 }
 exports.DocNode = DocNode;

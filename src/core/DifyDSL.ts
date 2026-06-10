@@ -185,15 +185,33 @@ export class DifyDSL {
   setEnv(name: string, value: unknown, type: "string" | "number"): void {
     const existing = this.envVariables.find((e: any) => e.name === name) as any;
     if (existing) { existing.value = value; existing.value_type = type; }
-    else { this.envVariables.push({ name, value, value_type: type, description: "" }); }
+    else {
+      this.envVariables.push({
+        id: crypto.randomUUID(),
+        name,
+        value,
+        value_type: type,
+        description: "",
+        selector: ["env", name],
+      });
+    }
   }
   removeEnv(name: string): void {
     this.envVariables = this.envVariables.filter((e: any) => e.name !== name);
   }
-  setConv(name: string, type = "string"): void {
+  setConv(name: string, type: "string" | "number" = "string"): void {
     const existing = this.convVariables.find((c: any) => c.name === name) as any;
-    if (existing) existing.value_type = type;
-    else { this.convVariables.push({ name, value_type: type, description: "" }); }
+    if (existing) { existing.value_type = type; }
+    else {
+      this.convVariables.push({
+        id: crypto.randomUUID(),
+        name,
+        value_type: type,
+        description: "",
+        selector: ["conversation", name],
+        value: type === "number" ? 0 : "",
+      });
+    }
   }
 
   // ─────── ⑥ toJSON ───────
@@ -277,6 +295,27 @@ export class DifyDSL {
           errors.push({ message: `Code ${n.id} output '${name}' type '${out.type}' is invalid` });
         }
       }
+    }
+
+    // 5. Environment variables must have id + selector
+    for (const ev of this.envVariables as any[]) {
+      if (!ev.id) errors.push({ message: `Env variable '${ev.name}' missing 'id'` });
+      if (!ev.selector || !ev.selector.length) errors.push({ message: `Env variable '${ev.name}' missing 'selector'` });
+    }
+
+    // 6. Conversation variables must have id + selector + value matches type
+    for (const cv of this.convVariables as any[]) {
+      if (!cv.id) errors.push({ message: `Conv variable '${cv.name}' missing 'id'` });
+      if (!cv.selector || !cv.selector.length) errors.push({ message: `Conv variable '${cv.name}' missing 'selector'` });
+      if (cv.value_type === "number" && typeof cv.value !== "number") {
+        errors.push({ message: `Conv variable '${cv.name}' value_type=number but value is ${typeof cv.value}` });
+      }
+    }
+
+    // 7. LLM nodes must have context + vision fields
+    for (const n of this.findByType("llm")) {
+      if (!(n as any).data.context) errors.push({ message: `LLM ${n.id} missing 'context' field` });
+      if (!(n as any).data.vision) errors.push({ message: `LLM ${n.id} missing 'vision' field` });
     }
 
     return { errors, warnings };

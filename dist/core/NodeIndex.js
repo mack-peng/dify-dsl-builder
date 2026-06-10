@@ -98,15 +98,13 @@ class NodeIndex {
     }
     // ─── Internal ───
     _removeEdgesFor(id) {
-        const toRemove = [];
-        for (const [eid, e] of this.edges) {
-            if (e.source === id || e.target === id) {
-                toRemove.push(eid);
-            }
-        }
-        for (const eid of toRemove) {
+        const toRemove = new Set();
+        for (const eid of this.outEdges.get(id) ?? [])
+            toRemove.add(eid);
+        for (const eid of this.inEdges.get(id) ?? [])
+            toRemove.add(eid);
+        for (const eid of toRemove)
             this.removeEdge(eid);
-        }
     }
     /** Populate from flat arrays (used during initial parse) */
     rebuild(nodes, edges) {

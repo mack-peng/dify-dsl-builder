@@ -67,9 +67,3 @@ export interface Viewport {
     y: number;
     zoom: number;
 }
-export interface EdgeRef {
-    edge: EdgeData;
-    source: string;
-    target: string;
-    sourceHandle: string;
-}

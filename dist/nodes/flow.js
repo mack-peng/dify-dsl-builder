@@ -26,6 +26,11 @@ class KnowledgeNode extends base_1.BaseNode {
                 top_k: this.data.multiple_retrieval_config.top_k,
             };
         }
+        if (this.data.retrieval_mode === "single" && this.data.single_retrieval_config) {
+            extra.single_retrieval_config = {
+                model: { ...this.data.single_retrieval_config.model },
+            };
+        }
         return this.outerJSON(this.dataJSON(extra));
     }
     // ─── Methods ───
@@ -55,6 +60,7 @@ class KnowledgeNode extends base_1.BaseNode {
             query_variable_selector: d.query_variable_selector,
             retrieval_mode: d.retrieval_mode,
             multiple_retrieval_config: d.multiple_retrieval_config,
+            single_retrieval_config: d.single_retrieval_config,
         });
         node.setPosition(raw.position.x, raw.position.y);
         node.width = raw.width;

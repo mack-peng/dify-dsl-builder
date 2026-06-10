@@ -65,7 +65,7 @@ export declare class DifyDSL {
     save(filePath: string): void;
     setEnv(name: string, value: unknown, type: "string" | "number"): void;
     removeEnv(name: string): void;
-    setConv(name: string, type?: string): void;
+    setConv(name: string, type?: "string" | "number"): void;
     toJSON(): DifyDSLJSON;
     validate(): {
         errors: {

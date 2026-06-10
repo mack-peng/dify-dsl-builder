@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DifyDSL = void 0;
 const fs = __importStar(require("fs"));
 const yaml = __importStar(require("js-yaml"));
+const index_1 = require("../nodes/index");
 const NodeIndex_1 = require("./NodeIndex");
 /**
  * 7-step pipeline:
@@ -183,7 +184,14 @@ class DifyDSL {
             existing.value_type = type;
         }
         else {
-            this.envVariables.push({ name, value, value_type: type, description: "" });
+            this.envVariables.push({
+                id: crypto.randomUUID(),
+                name,
+                value,
+                value_type: type,
+                description: "",
+                selector: ["env", name],
+            });
         }
     }
     removeEnv(name) {
@@ -191,10 +199,18 @@ class DifyDSL {
     }
     setConv(name, type = "string") {
         const existing = this.convVariables.find((c) => c.name === name);
-        if (existing)
+        if (existing) {
             existing.value_type = type;
+        }
         else {
-            this.convVariables.push({ name, value_type: type, description: "" });
+            this.convVariables.push({
+                id: crypto.randomUUID(),
+                name,
+                value_type: type,
+                description: "",
+                selector: ["conversation", name],
+                value: type === "number" ? 0 : "",
+            });
         }
     }
     // ─────── ⑥ toJSON ───────
@@ -274,6 +290,30 @@ class DifyDSL {
                 }
             }
         }
+        // 5. Environment variables must have id + selector
+        for (const ev of this.envVariables) {
+            if (!ev.id)
+                errors.push({ message: `Env variable '${ev.name}' missing 'id'` });
+            if (!ev.selector || !ev.selector.length)
+                errors.push({ message: `Env variable '${ev.name}' missing 'selector'` });
+        }
+        // 6. Conversation variables must have id + selector + value matches type
+        for (const cv of this.convVariables) {
+            if (!cv.id)
+                errors.push({ message: `Conv variable '${cv.name}' missing 'id'` });
+            if (!cv.selector || !cv.selector.length)
+                errors.push({ message: `Conv variable '${cv.name}' missing 'selector'` });
+            if (cv.value_type === "number" && typeof cv.value !== "number") {
+                errors.push({ message: `Conv variable '${cv.name}' value_type=number but value is ${typeof cv.value}` });
+            }
+        }
+        // 7. LLM nodes must have context + vision fields
+        for (const n of this.findByType("llm")) {
+            if (!n.data.context)
+                errors.push({ message: `LLM ${n.id} missing 'context' field` });
+            if (!n.data.vision)
+                errors.push({ message: `LLM ${n.id} missing 'vision' field` });
+        }
         return { errors, warnings };
     }
     // ─────── ⑦ toYAML ───────
@@ -290,7 +330,6 @@ class DifyDSL {
 }
 exports.DifyDSL = DifyDSL;
 // ─────── Internal helpers ───────
-const index_1 = require("../nodes/index");
 function buildNodes(rawNodes) {
     const nodes = [];
     const pendingStart = [];
@@ -313,10 +352,12 @@ function buildNodes(rawNodes) {
         const node = Ctor.fromYAML(rn);
         nodes.push(node);
     }
+    // Build id→node map for O(1) parent lookup in pass 2
+    const nodeById = new Map(nodes.map(n => [n.id, n]));
     // Pass 2: wire iteration-start + children to their parent
     for (const rn of pendingStart) {
         const parentId = rn.parentId;
-        const parent = nodes.find(n => n.id === parentId);
+        const parent = nodeById.get(parentId);
         if (!parent)
             continue;
         const dtype = rn.data?.type;

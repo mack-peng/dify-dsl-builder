@@ -1,8 +1,8 @@
 import { BaseNode } from "./base";
 import { XY, BaseNodeData, PromptMessage, ModelConfig, MemoryConfig } from "../types/common";
-import { YAMLWriter } from "../serializer";
 
-interface StartVariable {
+// ─── StartVariable ───
+export interface StartVariable {
   variable: string;
   label: string;
   type: string;
@@ -18,6 +18,7 @@ interface StartNodeData extends BaseNodeData {
   variables: StartVariable[];
 }
 
+// ─── StartNode ───
 export class StartNode extends BaseNode<StartNodeData> {
   constructor(id: string, data?: Partial<StartNodeData>) {
     super(id, "custom", {
@@ -26,34 +27,38 @@ export class StartNode extends BaseNode<StartNodeData> {
     });
   }
 
-  toYAML(w: YAMLWriter): void {
-    w.listItem(() => {
-      this.writeDataHead(w);
-      w.key("variables");
-      w.incIndent();
-      this.data.variables.forEach(v => {
-        w.listItem(() => {
-          w.keyQuoted("label", v.label);
-          if (v.max_length) w.keyVal("max_length", v.max_length);
-            if (v.options.length === 0) {
-              w.raw("options: []");
-            } else {
-              w.key("options");
-              w.incIndent();
-              v.options.forEach(o => w.raw(`- ${o}`));
-              w.decIndent();
-            }
-          w.keyQuoted("placeholder", v.placeholder ?? "");
-          w.keyVal("required", v.required);
-          w.keyVal("type", v.type);
-          w.keyVal("variable", v.variable);
-        });
-      });
-      w.decIndent();
-      this.closeData(w);
-      this.writeOuter(w);
-    });
+  toJSON(): Record<string, unknown> {
+    return this.outerJSON(this.dataJSON({
+      variables: this.data.variables.map(v => ({
+        label: v.label,
+        ...(v.max_length != null ? { max_length: v.max_length } : {}),
+        options: v.options.length > 0 ? v.options : [],
+        placeholder: v.placeholder ?? "",
+        required: v.required,
+        type: v.type,
+        variable: v.variable,
+      })),
+    }));
   }
+
+  // ─── Methods ───
+  addVariable(v: StartVariable): this {
+    this.data.variables.push(v);
+    return this;
+  }
+
+  removeVariable(name: string): this {
+    this.data.variables = this.data.variables.filter(v => v.variable !== name);
+    return this;
+  }
+
+  updateVariable(name: string, patch: Partial<StartVariable>): this {
+    const v = this.data.variables.find(x => x.variable === name);
+    if (v) Object.assign(v, patch);
+    return this;
+  }
+
+  get variables(): StartVariable[] { return this.data.variables; }
 
   static override fromYAML(raw: Record<string, unknown>): StartNode {
     const node = new StartNode(raw.id as string);
@@ -67,16 +72,19 @@ export class StartNode extends BaseNode<StartNodeData> {
     }));
     node.width = raw.width as number;
     node.height = raw.height as number;
+    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
     return node;
   }
 }
 
+// ─── AnswerNodeData ───
 interface AnswerNodeData extends BaseNodeData {
   type: "answer";
   answer: string;
   variables: { variable: string; value_selector: [string, string]; value_type?: string }[];
 }
 
+// ─── AnswerNode ───
 export class AnswerNode extends BaseNode<AnswerNodeData> {
   constructor(id: string, data?: Partial<AnswerNodeData>) {
     super(id, "custom", {
@@ -85,28 +93,36 @@ export class AnswerNode extends BaseNode<AnswerNodeData> {
     });
   }
 
-  toYAML(w: YAMLWriter): void {
-    w.listItem(() => {
-      this.writeDataHead(w);
-      w.keyQuoted("answer", this.data.answer);
-      w.key("variables");
-      w.incIndent();
-      this.data.variables.forEach(v => {
-        w.listItem(() => {
-          w.keyVal("variable", v.variable);
-          w.key("value_selector");
-          w.incIndent();
-          w.raw(`- '${v.value_selector[0]}'`);
-          w.raw(`- ${v.value_selector[1]}`);
-          w.decIndent();
-          if (v.value_type) w.keyVal("value_type", v.value_type);
-        });
-      });
-      w.decIndent();
-      this.closeData(w);
-      this.writeOuter(w);
-    });
+  toJSON(): Record<string, unknown> {
+    return this.outerJSON(this.dataJSON({
+      answer: this.data.answer,
+      variables: this.data.variables.map(v => {
+        const obj: Record<string, unknown> = {
+          variable: v.variable,
+          value_selector: [v.value_selector[0], v.value_selector[1]],
+        };
+        if (v.value_type) obj.value_type = v.value_type;
+        return obj;
+      }),
+    }));
   }
+
+  // ─── Methods ───
+  setAnswer(tpl: string): this { this.data.answer = tpl; return this; }
+  get answer(): string { return this.data.answer; }
+
+  addVariableRef(nodeId: string, field: string, valueType?: string): this {
+    const dotName = `${nodeId}.${field}`;
+    this.data.variables.push({ variable: dotName, value_selector: [nodeId, field], value_type: valueType });
+    return this;
+  }
+
+  removeVariableRef(nodeId: string): this {
+    this.data.variables = this.data.variables.filter(v => !v.variable.startsWith(nodeId));
+    return this;
+  }
+
+  get answerVariables(): AnswerNodeData["variables"] { return this.data.variables; }
 
   static override fromYAML(raw: Record<string, unknown>): AnswerNode {
     const d = raw.data as Record<string, unknown>;
@@ -118,10 +134,17 @@ export class AnswerNode extends BaseNode<AnswerNodeData> {
     node.data.variables = (d.variables as AnswerNodeData["variables"]) ?? [];
     node.width = raw.width as number;
     node.height = raw.height as number;
+    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
     return node;
   }
 }
 
+// ─── PromptConfig ───
+interface PromptConfig {
+  jinja2_variables: unknown[];
+}
+
+// ─── LLMNodeData ───
 interface LLMNodeData extends BaseNodeData {
   type: "llm";
   model: ModelConfig;
@@ -129,8 +152,10 @@ interface LLMNodeData extends BaseNodeData {
   context: { enabled: boolean; variable_selector: string[] };
   vision: { enabled: boolean };
   memory?: MemoryConfig;
+  prompt_config?: PromptConfig;
 }
 
+// ─── LLMNode ───
 export class LLMNode extends BaseNode<LLMNodeData> {
   constructor(id: string, data?: Partial<LLMNodeData>) {
     super(id, "custom", {
@@ -140,81 +165,92 @@ export class LLMNode extends BaseNode<LLMNodeData> {
       context: data?.context ?? { enabled: false, variable_selector: [] },
       vision: data?.vision ?? { enabled: false },
       memory: data?.memory,
+      prompt_config: data?.prompt_config,
     });
   }
 
-  toYAML(w: YAMLWriter): void {
-    w.listItem(() => {
-      this.writeDataHead(w);
-      // context
-      w.key("context");
-      w.incIndent();
-      w.keyVal("enabled", this.data.context.enabled);
-      if (this.data.context.variable_selector.length === 0) {
-        w.raw("variable_selector: []");
-      } else {
-        w.key("variable_selector");
-        w.incIndent();
-        this.data.context.variable_selector.forEach((s, i) => {
-          if (i === 0) w.raw(`- '${s}'`);
-          else w.raw(`- ${s}`);
-        });
-        w.decIndent();
-      }
-      w.decIndent();
-      // memory
-      if (this.data.memory) {
-        w.key("memory");
-        w.incIndent();
-        w.keyQuoted("query_prompt_template", this.data.memory!.query_prompt_template);
-        if (this.data.memory!.role_prefix) {
-          w.key("role_prefix");
-          w.incIndent();
-          w.keyQuoted("assistant", this.data.memory!.role_prefix!.assistant);
-          w.keyQuoted("user", this.data.memory!.role_prefix!.user);
-          w.decIndent();
-        }
-        w.key("window");
-        w.incIndent();
-        w.keyVal("enabled", this.data.memory!.window.enabled);
-        w.keyVal("size", this.data.memory!.window.size);
-        w.decIndent();
-        w.decIndent();
-      }
-      // model
-      w.key("model");
-      w.incIndent();
-      w.key("completion_params");
-      w.incIndent();
-      Object.entries(this.data.model.completion_params).forEach(([k, v]) => {
-        if (typeof v === "string") w.keyQuoted(k, v);
-        else w.keyVal(k, v as string | number | boolean);
-      });
-      w.decIndent();
-      w.keyVal("mode", this.data.model.mode);
-      w.keyQuoted("name", this.data.model.name);
-      w.keyQuoted("provider", this.data.model.provider);
-      w.decIndent();
-      // prompt_template
-      w.key("prompt_template");
-      w.incIndent();
-      this.data.prompt_template.forEach(p => {
-        w.listItem(() => {
-          if (p.id) w.keyVal("id", p.id);
-          w.keyVal("role", p.role);
-          w.blockScalar("text", p.text);
-        });
-      });
-      w.decIndent();
-      // vision
-      w.key("vision");
-      w.incIndent();
-      w.keyVal("enabled", this.data.vision.enabled);
-      w.decIndent();
-      this.closeData(w);
-      this.writeOuter(w);
-    });
+  toJSON(): Record<string, unknown> {
+    const extra: Record<string, unknown> = {
+      context: {
+        enabled: this.data.context.enabled,
+        variable_selector: [...this.data.context.variable_selector],
+      },
+      model: {
+        provider: this.data.model.provider,
+        name: this.data.model.name,
+        mode: this.data.model.mode,
+        completion_params: { ...this.data.model.completion_params },
+      },
+      prompt_template: this.data.prompt_template.map(p => {
+        const obj: Record<string, unknown> = { role: p.role, text: p.text };
+        if (p.id) obj.id = p.id;
+        return obj;
+      }),
+      vision: { enabled: this.data.vision.enabled },
+    };
+    if (this.data.memory) {
+      extra.memory = {
+        query_prompt_template: this.data.memory.query_prompt_template,
+        window: { enabled: this.data.memory.window.enabled, size: this.data.memory.window.size },
+        ...(this.data.memory.role_prefix ? {
+          role_prefix: {
+            assistant: this.data.memory.role_prefix.assistant,
+            user: this.data.memory.role_prefix.user,
+          },
+        } : {}),
+      };
+    }
+    if (this.data.prompt_config) {
+      extra.prompt_config = {
+        jinja2_variables: [...this.data.prompt_config.jinja2_variables],
+      };
+    }
+    return this.outerJSON(this.dataJSON(extra));
   }
+
+  // ─── Methods ───
+  setModel(provider: string, name: string): this {
+    this.data.model.provider = provider;
+    this.data.model.name = name;
+    return this;
+  }
+
+  setTemperature(t: number): this {
+    (this.data.model.completion_params as any).temperature = t;
+    return this;
+  }
+
+  setContextEnabled(enabled: boolean): this {
+    this.data.context.enabled = enabled;
+    return this;
+  }
+
+  setContextSelector(nodeId: string, field: string): this {
+    this.data.context.variable_selector = [nodeId, field];
+    return this;
+  }
+
+  addPromptMessage(msg: PromptMessage): this {
+    this.data.prompt_template.push(msg);
+    return this;
+  }
+
+  setMemory(windowSize: number): this {
+    this.data.memory = {
+      window: { enabled: true, size: windowSize },
+      query_prompt_template: "{{#sys.query#}}",
+    };
+    return this;
+  }
+
+  clearMemory(): this {
+    this.data.memory = undefined;
+    return this;
+  }
+
+  get promptMessages(): PromptMessage[] { return this.data.prompt_template; }
+  get modelConfig(): ModelConfig { return this.data.model; }
+  get hasMemory(): boolean { return !!this.data.memory; }
 
   static override fromYAML(raw: Record<string, unknown>): LLMNode {
     const d = raw.data as Record<string, unknown>;
@@ -225,10 +261,12 @@ export class LLMNode extends BaseNode<LLMNodeData> {
       context: d.context as LLMNodeData["context"],
       vision: d.vision as LLMNodeData["vision"],
       memory: d.memory as MemoryConfig,
+      prompt_config: d.prompt_config as PromptConfig,
     });
     node.setPosition((raw.position as XY).x, (raw.position as XY).y);
     node.width = raw.width as number;
     node.height = raw.height as number;
+    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
     return node;
   }
 }

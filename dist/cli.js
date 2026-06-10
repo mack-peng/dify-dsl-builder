@@ -37,7 +37,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_child_process_1 = require("node:child_process");
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
-const index_1 = require("./index");
+const DifyDSL_1 = require("./core/DifyDSL");
 const patch_1 = require("./patch");
 const USAGE = `
 dify-dsl-cli <command> [options]
@@ -69,8 +69,9 @@ function cmd_roundtrip(args) {
     const output = args[1] ? resolvePath(args[1]) : input.replace(/\.yml$/, ".roundtrip.yml");
     if (!fs.existsSync(input))
         fail(`File not found: ${input}`);
-    const dsl = index_1.DifyDSL.load(input);
-    console.log(`Load: ${dsl.graph.nodeCount} nodes, ${dsl.graph.edgeCount} edges, mode=${dsl.mode}`);
+    const str = fs.readFileSync(input, "utf-8");
+    const dsl = DifyDSL_1.DifyDSL.parse(str);
+    console.log(`Load: ${dsl.nodeCount} nodes, ${dsl.edgeCount} edges, mode=${dsl.mode}`);
     dsl.save(output);
     console.log(`Save: ${output}`);
     // Validate
@@ -100,13 +101,14 @@ function cmd_info(args) {
     const file = resolvePath(args[0]);
     if (!fs.existsSync(file))
         fail(`File not found: ${file}`);
-    const dsl = index_1.DifyDSL.load(file);
+    const str = fs.readFileSync(file, "utf-8");
+    const dsl = DifyDSL_1.DifyDSL.parse(str);
     console.log(`File:     ${file}`);
     console.log(`Mode:     ${dsl.mode}`);
-    console.log(`Nodes:    ${dsl.graph.nodeCount}`);
-    console.log(`Edges:    ${dsl.graph.edgeCount}`);
+    console.log(`Nodes:    ${dsl.nodeCount}`);
+    console.log(`Edges:    ${dsl.edgeCount}`);
     const types = new Map();
-    for (const n of dsl.graph._nodes.values()) {
+    for (const n of dsl.index.byId.values()) {
         const t = n.data?.type || "?";
         types.set(t, (types.get(t) || 0) + 1);
     }
@@ -120,18 +122,19 @@ function cmd_apply(patchFile, input, output) {
         fail(`File not found: ${input}`);
     if (!fs.existsSync(patchFile))
         fail(`Patch file not found: ${patchFile}`);
-    const dsl = index_1.DifyDSL.load(input);
+    const str = fs.readFileSync(input, "utf-8");
+    const dsl = DifyDSL_1.DifyDSL.parse(str);
     const { description, steps } = (0, patch_1.loadPatch)(patchFile);
     if (description)
         console.log(`Patch: ${description}`);
-    console.log(`Load:  ${dsl.graph.nodeCount} nodes, ${dsl.graph.edgeCount} edges`);
+    console.log(`Load:  ${dsl.nodeCount} nodes, ${dsl.edgeCount} edges`);
     (0, patch_1.applyPatch)(dsl, steps);
-    console.log(`After: ${dsl.graph.nodeCount} nodes, ${dsl.graph.edgeCount} edges`);
+    console.log(`After: ${dsl.nodeCount} nodes, ${dsl.edgeCount} edges`);
     const report = dsl.validate();
-    if (!report.ok) {
+    if (report.errors.length > 0) {
         console.error("Validation failed:");
-        report.errors.forEach(e => console.error(`  ❌ [${e.code}] ${e.message}`));
-        report.warnings.forEach(w => console.warn(`  ⚠️ [${w.code}] ${w.message}`));
+        report.errors.forEach(e => console.error(`  ❌ ${e.message}`));
+        report.warnings.forEach(w => console.warn(`  ⚠️ ${w.message}`));
         process.exit(1);
     }
     console.log("✅ Validation passed");
@@ -143,14 +146,15 @@ function atomicNode(args, fileIdx, action) {
     const file = resolvePath(args[fileIdx]);
     if (!fs.existsSync(file))
         fail(`File not found: ${file}`);
-    const dsl = index_1.DifyDSL.load(file);
+    const str = fs.readFileSync(file, "utf-8");
+    const dsl = DifyDSL_1.DifyDSL.parse(str);
     action(dsl);
     dsl.save(file);
     console.log(`Saved: ${file}`);
 }
 function atomNodeSetTitle(args) {
     atomicNode(args, 0, (dsl) => {
-        const n = dsl.graph.find(args[1]);
+        const n = dsl.getNode(args[1]);
         if (n)
             n.setTitle(args[2]);
         else
@@ -159,7 +163,7 @@ function atomNodeSetTitle(args) {
 }
 function atomNodeSetDesc(args) {
     atomicNode(args, 0, (dsl) => {
-        const n = dsl.graph.find(args[1]);
+        const n = dsl.getNode(args[1]);
         if (n)
             n.setDesc(args[2]);
         else
@@ -168,7 +172,7 @@ function atomNodeSetDesc(args) {
 }
 function atomNodeSetPrompt(args) {
     atomicNode(args, 0, (dsl) => {
-        const llm = dsl.graph.findLLM(args[1]);
+        const llm = dsl.findLLM(args[1]);
         if (!llm)
             fail(`LLM not found: ${args[1]}`);
         const role = args[2];
@@ -187,7 +191,7 @@ function atomNodeSetPrompt(args) {
 }
 function atomEdgeAdd(args) {
     atomicNode(args, 0, (dsl) => {
-        dsl.graph.addEdge(new index_1.Edge(args[1], args[2], args[3] || "source"));
+        dsl.addEdge(args[1], args[2], args[3] || "source");
     });
 }
 function atomEdgeRemove(args) {
@@ -195,15 +199,18 @@ function atomEdgeRemove(args) {
         const id = args[3]
             ? `${args[1]}-${args[3]}-${args[2]}-target`
             : `${args[1]}-source-${args[2]}-target`;
-        const before = dsl.graph.edgeCount;
-        dsl.graph.removeEdge(id);
-        if (dsl.graph.edgeCount === before)
+        const before = dsl.edgeCount;
+        dsl.removeEdge(id);
+        if (dsl.edgeCount === before)
             fail(`Edge not found: ${id}`);
     });
 }
 function atomRemove(args) {
     atomicNode(args, 0, (dsl) => {
-        dsl.graph.remove(args[1]);
+        const n = dsl.getNode(args[1]);
+        if (!n)
+            fail(`Node not found: ${args[1]}`);
+        dsl.removeNode(args[1]);
     });
 }
 // ── Main ──

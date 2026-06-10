@@ -5,8 +5,13 @@ const nodes_1 = require("./nodes");
 class Graph {
     _nodes = new Map();
     _edges = [];
+    viewport = { x: 0, y: 0, zoom: 0.7 };
     get nodeCount() { return this._nodes.size; }
     get edgeCount() { return this._edges.length; }
+    setViewport(v) {
+        this.viewport = { ...v };
+        return this;
+    }
     // === Top-level find (no iteration recursion) ===
     find(id) {
         const n = this._nodes.get(id);
@@ -138,9 +143,9 @@ class Graph {
             // viewport
             w.key("viewport");
             w.indent(() => {
-                w.keyVal("x", "642.9890265047154");
-                w.keyVal("y", "196.87974640057033");
-                w.keyVal("zoom", "0.2520881137236488");
+                w.keyVal("x", this.viewport.x);
+                w.keyVal("y", this.viewport.y);
+                w.keyVal("zoom", this.viewport.zoom);
             });
         });
     }

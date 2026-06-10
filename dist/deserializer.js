@@ -93,10 +93,22 @@ function load(yamlStr) {
             }
         }
     }
+    // Post-process: set zIndex on all nodes (including iteration children)
+    for (const rn of raw.workflow.graph.nodes) {
+        if (rn.zIndex !== undefined) {
+            const node = graph.find(rn.id);
+            if (node)
+                node.setZIndex(rn.zIndex);
+        }
+    }
     // Pass 3: build edges
     for (const re of raw.workflow.graph.edges) {
         const edge = edge_1.Edge.fromYAML(re);
         graph.addEdge(edge);
+    }
+    // Viewport
+    if (raw.workflow.graph.viewport) {
+        graph.setViewport(raw.workflow.graph.viewport);
     }
     // Features
     const features = features_1.Features.fromYAML(raw.workflow.features);
@@ -109,6 +121,7 @@ function load(yamlStr) {
         features,
         envVariables: raw.workflow.environment_variables ?? [],
         convVariables: raw.workflow.conversation_variables ?? [],
+        ragVariables: raw.workflow.rag_pipeline_variables ?? [],
     };
 }
 function loadFromFile(filePath) {

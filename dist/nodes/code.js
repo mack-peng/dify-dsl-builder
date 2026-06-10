@@ -10,42 +10,52 @@ class CodeNode extends base_1.BaseNode {
             variables: data?.variables ?? [], outputs: data?.outputs ?? {},
         }, { height: data?.code ? Math.max(90, data.code.split("\n").length * 20) : 90 });
     }
-    toYAML(w) {
-        w.listItem(() => {
-            this.writeDataHead(w);
-            w.blockScalar("code", this.data.code);
-            w.keyVal("code_language", this.data.code_language);
-            // outputs
-            w.key("outputs");
-            w.incIndent();
-            Object.entries(this.data.outputs).forEach(([name, out]) => {
-                w.key(name);
-                w.incIndent();
-                w.key("children");
-                w.keyVal("type", out.type);
-                w.decIndent();
-            });
-            w.decIndent();
-            // variables
-            w.key("variables");
-            w.incIndent();
-            this.data.variables.forEach(v => {
-                w.listItem(() => {
-                    w.key("value_selector");
-                    w.incIndent();
-                    w.raw(`- '${v.value_selector[0]}'`);
-                    w.raw(`- ${v.value_selector[1]}`);
-                    w.decIndent();
-                    if (v.value_type)
-                        w.keyVal("value_type", v.value_type);
-                    w.keyVal("variable", v.variable);
-                });
-            });
-            w.decIndent();
-            this.closeData(w);
-            this.writeOuter(w);
-        });
+    toJSON() {
+        const outputs = {};
+        for (const [name, out] of Object.entries(this.data.outputs)) {
+            outputs[name] = { children: null, type: out.type };
+        }
+        return this.outerJSON(this.dataJSON({
+            code: this.data.code,
+            code_language: this.data.code_language,
+            outputs,
+            variables: this.data.variables.map(v => {
+                const obj = {
+                    variable: v.variable,
+                    value_selector: [v.value_selector[0], v.value_selector[1]],
+                };
+                if (v.value_type)
+                    obj.value_type = v.value_type;
+                return obj;
+            }),
+        }));
     }
+    // ─── Methods ───
+    setCode(lang, code) {
+        this.data.code_language = lang;
+        this.data.code = code;
+        return this;
+    }
+    addVariable(v) {
+        this.data.variables.push(v);
+        return this;
+    }
+    removeVariable(name) {
+        this.data.variables = this.data.variables.filter(x => x.variable !== name);
+        return this;
+    }
+    addOutput(name, type) {
+        this.data.outputs[name] = { type, children: null };
+        return this;
+    }
+    removeOutput(name) {
+        delete this.data.outputs[name];
+        return this;
+    }
+    get code() { return this.data.code; }
+    get codeLanguage() { return this.data.code_language; }
+    get inputVariables() { return this.data.variables; }
+    get outputDefs() { return this.data.outputs; }
     static fromYAML(raw) {
         const d = raw.data;
         const node = new CodeNode(raw.id, {
@@ -58,6 +68,8 @@ class CodeNode extends base_1.BaseNode {
         node.setPosition(raw.position.x, raw.position.y);
         node.width = raw.width;
         node.height = raw.height;
+        if (raw.zIndex !== undefined)
+            node.zIndex = raw.zIndex;
         return node;
     }
 }

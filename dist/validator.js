@@ -4,8 +4,8 @@ exports.validate = validate;
 const nodes_1 = require("./nodes");
 const validation_1 = require("./types/validation");
 const VALID_CODE_TYPES = new Set([
-    "string", "number", "integer", "boolean", "object", "file", "secret",
-    "array[string]", "array[number]", "array[object]", "array[boolean]", "array[file]", "array[any]", "none",
+    "string", "number", "integer", "float", "boolean", "object", "file", "secret",
+    "array[string]", "array[number]", "array[integer]", "array[float]", "array[object]", "array[boolean]", "array[file]", "array[any]", "none", "group",
 ]);
 function validate(graph, mode) {
     const r = (0, validation_1.createReport)();

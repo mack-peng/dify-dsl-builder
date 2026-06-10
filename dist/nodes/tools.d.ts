@@ -1,6 +1,5 @@
 import { BaseNode } from "./base";
 import { BaseNodeData, ParamSchema, ToolParamValue, ModelConfig, ClassDefinition } from "../types/common";
-import { YAMLWriter } from "../serializer";
 interface ToolNodeData extends BaseNodeData {
     type: "tool";
     is_team_authorization: boolean;
@@ -21,7 +20,10 @@ interface ToolNodeData extends BaseNodeData {
 }
 export declare class ToolNode extends BaseNode<ToolNodeData> {
     constructor(id: string, data?: Partial<ToolNodeData>);
-    toYAML(w: YAMLWriter): void;
+    toJSON(): Record<string, unknown>;
+    setPlugin(pluginId: string, uniqueId: string): this;
+    setToolParam(name: string, value: ToolParamValue): this;
+    setToolConfig(key: string, value: unknown): this;
     static fromYAML(raw: Record<string, unknown>): ToolNode;
 }
 interface ClassifierNodeData extends BaseNodeData {
@@ -33,7 +35,11 @@ interface ClassifierNodeData extends BaseNodeData {
 }
 export declare class ClassifierNode extends BaseNode<ClassifierNodeData> {
     constructor(id: string, data?: Partial<ClassifierNodeData>);
-    toYAML(w: YAMLWriter): void;
+    toJSON(): Record<string, unknown>;
+    addClass(cls: ClassDefinition): this;
+    removeClass(id: string): this;
+    setModel(provider: string, name: string): this;
+    setInstructions(instructions: string): this;
     static fromYAML(raw: Record<string, unknown>): ClassifierNode;
 }
 interface HTTPNodeData extends BaseNodeData {
@@ -57,7 +63,7 @@ interface HTTPNodeData extends BaseNodeData {
 }
 export declare class HTTPNode extends BaseNode<HTTPNodeData> {
     constructor(id: string, data?: Partial<HTTPNodeData>);
-    toYAML(w: YAMLWriter): void;
+    toJSON(): Record<string, unknown>;
     static fromYAML(raw: Record<string, unknown>): HTTPNode;
 }
 interface DocNodeData extends BaseNodeData {
@@ -67,7 +73,7 @@ interface DocNodeData extends BaseNodeData {
 }
 export declare class DocNode extends BaseNode<DocNodeData> {
     constructor(id: string, data?: Partial<DocNodeData>);
-    toYAML(w: YAMLWriter): void;
+    toJSON(): Record<string, unknown>;
     static fromYAML(raw: Record<string, unknown>): DocNode;
 }
 export {};

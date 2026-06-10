@@ -1,7 +1,6 @@
 import * as yaml from "js-yaml";
 import * as fs from "fs";
-import { DifyDSL } from "./index";
-import { Edge } from "./edge";
+import { DifyDSL } from "./core/DifyDSL";
 import { CodeNode } from "./nodes/code";
 
 // ── Patch step types ──
@@ -77,18 +76,17 @@ function applyStep(dsl: DifyDSL, raw: Record<string, any>): void {
   switch (key) {
     case "remove-edge": {
       const id = `${val.source}-${val.sourceHandle || "source"}-${val.target}-target`;
-      dsl.graph.removeEdge(id);
-      // Also try with true/false handle
-      dsl.graph.removeEdge(`${val.source}-true-${val.target}-target`);
-      dsl.graph.removeEdge(`${val.source}-false-${val.target}-target`);
+      dsl.removeEdge(id);
+      dsl.removeEdge(`${val.source}-true-${val.target}-target`);
+      dsl.removeEdge(`${val.source}-false-${val.target}-target`);
       break;
     }
     case "remove-node": {
-      dsl.graph.remove(val.id);
+      dsl.removeNode(val.id);
       break;
     }
     case "add-edge": {
-      dsl.graph.addEdge(new Edge(val.source, val.target, val.handle || "source"));
+      dsl.addEdge(val.source, val.target, val.handle || "source");
       break;
     }
     case "add-code-node": {
@@ -102,31 +100,31 @@ function applyStep(dsl: DifyDSL, raw: Record<string, any>): void {
       if (val.outputs) {
         node.data.outputs = val.outputs as any;
       }
-      dsl.graph.add(node);
+      dsl.addNode(node);
       if (val.position) node.setPosition(val.position.x, val.position.y);
       break;
     }
     case "add-classifier-class": {
-      const cls = dsl.graph.findClassifier(val.classifier);
+      const cls = dsl.findClassifier(val.classifier);
       if (cls) {
-        cls.data.classes?.push({ id: val.id, name: val.name, description: "" });
+        (cls.data as any).classes?.push({ id: val.id, name: val.name, description: "" });
       }
       break;
     }
     case "set-title": {
-      const n = dsl.graph.find(val.id);
-      if (n) (n as any).setTitle(val.value);
+      const n = dsl.getNode(val.id);
+      if (n) n.setTitle(val.value);
       break;
     }
     case "set-desc": {
-      const n = dsl.graph.find(val.id);
-      if (n) (n as any).setDesc(val.value);
+      const n = dsl.getNode(val.id);
+      if (n) n.setDesc(val.value);
       break;
     }
     case "set-prompt": {
-      const llm = dsl.graph.findLLM(val.id);
+      const llm = dsl.findLLM(val.id);
       if (llm) {
-        for (const msg of llm.data.prompt_template) {
+        for (const msg of (llm.data as any).prompt_template) {
           if (msg.role === val.role) {
             msg.text = msg.text.replace(val.replace, val.with);
           }
@@ -135,13 +133,13 @@ function applyStep(dsl: DifyDSL, raw: Record<string, any>): void {
       break;
     }
     case "set-position": {
-      const n = dsl.graph.find(val.id);
-      if (n) (n as any).setPosition(val.x, val.y);
+      const n = dsl.getNode(val.id);
+      if (n) n.setPosition(val.x, val.y);
       break;
     }
     case "set-answer": {
-      const a = dsl.graph.findAnswer(val.id);
-      if (a) a.data.answer = val.answer;
+      const a = dsl.findAnswer(val.id);
+      if (a) (a.data as any).answer = val.answer;
       break;
     }
     case "env-set": {
@@ -157,16 +155,16 @@ function applyStep(dsl: DifyDSL, raw: Record<string, any>): void {
       break;
     }
     case "set-code": {
-      const c = dsl.graph.findCode(val.id);
-      if (c) c.data.code = c.data.code.replace(val.replace, val.with);
+      const c = dsl.findCode(val.id);
+      if (c) (c.data as any).code = (c.data as any).code.replace(val.replace, val.with);
       break;
     }
     case "set-start-var": {
-      const s = dsl.graph.findStart(val.id);
+      const s = dsl.findStart(val.id);
       if (s) {
-        for (const v of s.data.variables) {
+        for (const v of (s.data as any).variables) {
           if (v.variable === val.variable) {
-            (v as any)[val.field] = val.value;
+            v[val.field] = val.value;
           }
         }
       }

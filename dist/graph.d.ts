@@ -1,11 +1,22 @@
 import { Edge } from "./edge";
 import { YAMLWriter } from "./serializer";
 import { StartNode, AnswerNode, LLMNode, CodeNode, KnowledgeNode, IfElseNode, TemplateNode, AggregatorNode, IterationNode, ToolNode, ClassifierNode, AnyNode } from "./nodes";
+export interface Viewport {
+    x: number;
+    y: number;
+    zoom: number;
+}
 export declare class Graph {
     private _nodes;
     private _edges;
+    viewport: Viewport;
     get nodeCount(): number;
     get edgeCount(): number;
+    setViewport(v: {
+        x: number;
+        y: number;
+        zoom: number;
+    }): this;
     find(id: string): AnyNode | undefined;
     findStart(id: string): StartNode | undefined;
     findAnswer(id: string): AnswerNode | undefined;

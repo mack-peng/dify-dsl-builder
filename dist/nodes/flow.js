@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IterationStartNode = exports.IterationNode = exports.AggregatorNode = exports.TemplateNode = exports.IfElseNode = exports.KnowledgeNode = void 0;
 const base_1 = require("./base");
-const code_1 = require("./code");
 class KnowledgeNode extends base_1.BaseNode {
     constructor(id, data) {
         super(id, "custom", {
@@ -14,30 +13,39 @@ class KnowledgeNode extends base_1.BaseNode {
             single_retrieval_config: data?.single_retrieval_config,
         });
     }
-    toYAML(w) {
-        w.listItem(() => {
-            this.writeDataHead(w);
-            w.key("dataset_ids");
-            w.incIndent();
-            this.data.dataset_ids.forEach(ds => w.raw(`- ${ds}`));
-            w.decIndent();
-            if (this.data.retrieval_mode === "multiple" && this.data.multiple_retrieval_config) {
-                w.key("multiple_retrieval_config");
-                w.incIndent();
-                w.keyVal("reranking_enable", this.data.multiple_retrieval_config.reranking_enable);
-                w.key("score_threshold");
-                w.keyVal("top_k", this.data.multiple_retrieval_config.top_k);
-                w.decIndent();
-            }
-            w.key("query_variable_selector");
-            w.incIndent();
-            w.raw(`- '${this.data.query_variable_selector[0]}'`);
-            w.raw(`- ${this.data.query_variable_selector[1]}`);
-            w.decIndent();
-            w.keyVal("retrieval_mode", this.data.retrieval_mode);
-            this.closeData(w);
-            this.writeOuter(w);
-        });
+    toJSON() {
+        const extra = {
+            dataset_ids: [...this.data.dataset_ids],
+            query_variable_selector: [this.data.query_variable_selector[0], this.data.query_variable_selector[1]],
+            retrieval_mode: this.data.retrieval_mode,
+        };
+        if (this.data.retrieval_mode === "multiple" && this.data.multiple_retrieval_config) {
+            extra.multiple_retrieval_config = {
+                reranking_enable: this.data.multiple_retrieval_config.reranking_enable,
+                score_threshold: this.data.multiple_retrieval_config.score_threshold,
+                top_k: this.data.multiple_retrieval_config.top_k,
+            };
+        }
+        return this.outerJSON(this.dataJSON(extra));
+    }
+    // ─── Methods ───
+    addDataset(id) { this.data.dataset_ids.push(id); return this; }
+    removeDataset(id) {
+        this.data.dataset_ids = this.data.dataset_ids.filter(d => d !== id);
+        return this;
+    }
+    setQuerySelector(nodeId, field) {
+        this.data.query_variable_selector = [nodeId, field];
+        return this;
+    }
+    setTopK(n) {
+        if (!this.data.multiple_retrieval_config) {
+            this.data.multiple_retrieval_config = { top_k: n, score_threshold: null, reranking_enable: false };
+        }
+        else {
+            this.data.multiple_retrieval_config.top_k = n;
+        }
+        return this;
     }
     static fromYAML(raw) {
         const d = raw.data;
@@ -51,6 +59,8 @@ class KnowledgeNode extends base_1.BaseNode {
         node.setPosition(raw.position.x, raw.position.y);
         node.width = raw.width;
         node.height = raw.height;
+        if (raw.zIndex !== undefined)
+            node.zIndex = raw.zIndex;
         return node;
     }
 }
@@ -62,40 +72,39 @@ class IfElseNode extends base_1.BaseNode {
             cases: data?.cases ?? [],
         }, { height: 152 });
     }
-    toYAML(w) {
-        w.listItem(() => {
-            this.writeDataHead(w);
-            w.key("cases");
-            w.incIndent();
-            this.data.cases.forEach(c => {
-                w.listItem(() => {
-                    w.keyVal("case_id", `'${c.case_id}'`);
-                    w.key("conditions");
-                    w.incIndent();
-                    c.conditions.forEach(cond => {
-                        w.listItem(() => {
-                            w.keyQuoted("comparison_operator", cond.comparison_operator);
-                            if (cond.id)
-                                w.keyVal("id", cond.id);
-                            w.keySingleQuoted("value", cond.value ?? "");
-                            w.keyVal("varType", cond.varType ?? "string");
-                            w.key("variable_selector");
-                            w.incIndent();
-                            w.raw(`- '${cond.variable_selector[0]}'`);
-                            w.raw(`- ${cond.variable_selector[1]}`);
-                            w.decIndent();
-                        });
-                    });
-                    w.decIndent();
-                    w.keyVal("id", `'${c.id}'`);
-                    w.keyVal("logical_operator", c.logical_operator);
-                });
-            });
-            w.decIndent();
-            this.closeData(w);
-            this.writeOuter(w);
-        });
+    toJSON() {
+        return this.outerJSON(this.dataJSON({
+            cases: this.data.cases.map(c => ({
+                case_id: c.case_id,
+                id: c.id,
+                logical_operator: c.logical_operator,
+                conditions: c.conditions.map(cond => {
+                    const obj = {
+                        comparison_operator: cond.comparison_operator,
+                        variable_selector: [cond.variable_selector[0], cond.variable_selector[1]],
+                        value: cond.value,
+                        varType: cond.varType ?? "string",
+                    };
+                    if (cond.id)
+                        obj.id = cond.id;
+                    return obj;
+                }),
+            })),
+        }));
     }
+    // ─── Methods ───
+    addCase(c) { this.data.cases.push(c); return this; }
+    removeCase(id) {
+        this.data.cases = this.data.cases.filter(c => c.id !== id);
+        return this;
+    }
+    updateCondition(caseId, condIdx, patch) {
+        const c = this.data.cases.find(x => x.id === caseId);
+        if (c && c.conditions[condIdx])
+            Object.assign(c.conditions[condIdx], patch);
+        return this;
+    }
+    get cases() { return this.data.cases; }
     static fromYAML(raw) {
         const d = raw.data;
         const node = new IfElseNode(raw.id, {
@@ -105,6 +114,8 @@ class IfElseNode extends base_1.BaseNode {
         node.setPosition(raw.position.x, raw.position.y);
         node.width = raw.width;
         node.height = raw.height;
+        if (raw.zIndex !== undefined)
+            node.zIndex = raw.zIndex;
         return node;
     }
 }
@@ -116,29 +127,28 @@ class TemplateNode extends base_1.BaseNode {
             template: data?.template ?? "", variables: data?.variables ?? [],
         });
     }
-    toYAML(w) {
-        w.listItem(() => {
-            this.writeDataHead(w);
-            w.keyQuoted("template", this.data.template);
-            w.key("variables");
-            w.incIndent();
-            this.data.variables.forEach(v => {
-                w.listItem(() => {
-                    w.key("value_selector");
-                    w.incIndent();
-                    w.raw(`- '${v.value_selector[0]}'`);
-                    w.raw(`- ${v.value_selector[1]}`);
-                    w.decIndent();
-                    if (v.value_type)
-                        w.keyVal("value_type", v.value_type);
-                    w.keyVal("variable", v.variable);
-                });
-            });
-            w.decIndent();
-            this.closeData(w);
-            this.writeOuter(w);
-        });
+    toJSON() {
+        return this.outerJSON(this.dataJSON({
+            template: this.data.template,
+            variables: this.data.variables.map(v => {
+                const obj = {
+                    variable: v.variable,
+                    value_selector: [v.value_selector[0], v.value_selector[1]],
+                };
+                if (v.value_type)
+                    obj.value_type = v.value_type;
+                return obj;
+            }),
+        }));
     }
+    // ─── Methods ───
+    setTemplate(tpl) { this.data.template = tpl; return this; }
+    addVariable(v) { this.data.variables.push(v); return this; }
+    removeVariable(name) {
+        this.data.variables = this.data.variables.filter(x => x.variable !== name);
+        return this;
+    }
+    get template() { return this.data.template; }
     static fromYAML(raw) {
         const d = raw.data;
         const node = new TemplateNode(raw.id, {
@@ -149,6 +159,8 @@ class TemplateNode extends base_1.BaseNode {
         node.setPosition(raw.position.x, raw.position.y);
         node.width = raw.width;
         node.height = raw.height;
+        if (raw.zIndex !== undefined)
+            node.zIndex = raw.zIndex;
         return node;
     }
 }
@@ -160,23 +172,23 @@ class AggregatorNode extends base_1.BaseNode {
             output_type: data?.output_type ?? "array", variables: data?.variables ?? [],
         });
     }
-    toYAML(w) {
-        w.listItem(() => {
-            this.writeDataHead(w);
-            w.keyVal("output_type", this.data.output_type);
-            w.key("variables");
-            w.incIndent();
-            this.data.variables.forEach(v => {
-                w.listItem(() => {
-                    w.raw(`- '${v[0]}'`);
-                    w.raw(`- ${v[1]}`);
-                });
-            });
-            w.decIndent();
-            this.closeData(w);
-            this.writeOuter(w);
-        });
+    toJSON() {
+        return this.outerJSON(this.dataJSON({
+            output_type: this.data.output_type,
+            variables: this.data.variables.map(v => [v[0], v[1]]),
+        }));
     }
+    // ─── Methods ───
+    addSource(nodeId, field) {
+        this.data.variables.push([nodeId, field]);
+        return this;
+    }
+    removeSource(nodeId) {
+        this.data.variables = this.data.variables.filter(v => v[0] !== nodeId);
+        return this;
+    }
+    setOutputType(t) { this.data.output_type = t; return this; }
+    get sources() { return this.data.variables; }
     static fromYAML(raw) {
         const d = raw.data;
         const node = new AggregatorNode(raw.id, {
@@ -187,6 +199,8 @@ class AggregatorNode extends base_1.BaseNode {
         node.setPosition(raw.position.x, raw.position.y);
         node.width = raw.width;
         node.height = raw.height;
+        if (raw.zIndex !== undefined)
+            node.zIndex = raw.zIndex;
         return node;
     }
 }
@@ -209,19 +223,7 @@ class IterationNode extends base_1.BaseNode {
             height: data?.height ?? 250,
         }, { width: data?.width ?? 650, height: data?.height ?? 250 });
     }
-    findChildCode(id) {
-        return this.children.find(c => c.id === id && c instanceof code_1.CodeNode);
-    }
-    findChildKB(id) {
-        return this.children.find(c => c.id === id && c instanceof KnowledgeNode);
-    }
-    findChildTemplate(id) {
-        return this.children.find(c => c.id === id && c instanceof TemplateNode);
-    }
-    findChild(id) {
-        return this.children.find(c => c.id === id);
-    }
-    addChild(node, _opts) {
+    addChild(node) {
         Object.assign(node, {
             parentId: this.id,
             isInIteration: true,
@@ -231,36 +233,33 @@ class IterationNode extends base_1.BaseNode {
         this.children.push(child);
         return child;
     }
-    toYAML(w) {
-        w.listItem(() => {
-            this.writeDataHead(w);
-            w.keyQuoted("error_handle_mode", this.data.error_handle_mode);
-            w.keyVal("height", this.data.height);
-            w.keyVal("is_parallel", this.data.is_parallel);
-            w.keyVal("iterator_input_type", this.data.iterator_input_type);
-            w.key("iterator_selector");
-            w.incIndent();
-            w.raw(`- '${this.data.iterator_selector[0]}'`);
-            w.raw(`- ${this.data.iterator_selector[1]}`);
-            w.decIndent();
-            w.key("output_selector");
-            w.incIndent();
-            w.raw(`- '${this.data.output_selector[0]}'`);
-            w.raw(`- ${this.data.output_selector[1]}`);
-            w.decIndent();
-            w.keyVal("output_type", this.data.output_type);
-            w.keyVal("parallel_nums", this.data.parallel_nums);
-            w.keySingleQuoted("start_node_id", this.data.start_node_id);
-            w.keyVal("width", this.data.width);
-            this.closeData(w);
-            this.writeOuter(w);
-        });
-        // Write child nodes
-        if (this.startNode)
-            this.startNode.toYAML(w);
-        this.children.forEach(c => {
-            c.toYAML(w);
-        });
+    removeChild(id) {
+        this.children = this.children.filter(c => c.id !== id);
+    }
+    findChild(id) {
+        return this.children.find(c => c.id === id);
+    }
+    setIterator(nodeId, field) {
+        this.data.iterator_selector = [nodeId, field];
+        return this;
+    }
+    setOutputSelector(nodeId, field) {
+        this.data.output_selector = [nodeId, field];
+        return this;
+    }
+    toJSON() {
+        return this.outerJSON(this.dataJSON({
+            error_handle_mode: this.data.error_handle_mode,
+            height: this.data.height,
+            is_parallel: this.data.is_parallel,
+            iterator_input_type: this.data.iterator_input_type,
+            iterator_selector: [this.data.iterator_selector[0], this.data.iterator_selector[1]],
+            output_selector: [this.data.output_selector[0], this.data.output_selector[1]],
+            output_type: this.data.output_type,
+            parallel_nums: this.data.parallel_nums,
+            start_node_id: this.data.start_node_id,
+            width: this.data.width,
+        }));
     }
     static fromYAML(raw) {
         const d = raw.data;
@@ -279,6 +278,8 @@ class IterationNode extends base_1.BaseNode {
         node.setPosition(raw.position.x, raw.position.y);
         node.width = raw.width;
         node.height = raw.height;
+        if (raw.zIndex !== undefined)
+            node.zIndex = raw.zIndex;
         return node;
     }
 }
@@ -286,7 +287,7 @@ exports.IterationNode = IterationNode;
 class IterationStartNode extends base_1.BaseNode {
     parentId;
     constructor(parentIterId, data) {
-        const id = data?.title ? parentIterId + "-start" : parentIterId + "-start";
+        const id = parentIterId + "-start";
         super(id, "custom-iteration-start", {
             type: "iteration-start", title: data?.title ?? "", desc: data?.desc ?? "", selected: false,
             isInIteration: true, iteration_id: parentIterId,
@@ -296,39 +297,31 @@ class IterationStartNode extends base_1.BaseNode {
         this.data.isInIteration = true;
         this.data.iteration_id = parentIterId;
     }
-    toYAML(w) {
-        w.listItem(() => {
-            w.keyVal("draggable", false);
-            w.keyVal("height", this.height);
-            w.keySingleQuoted("id", this.id);
-            w.keySingleQuoted("parentId", this.parentId);
-            w.key("position");
-            w.incIndent();
-            w.keyVal("x", this.position.x);
-            w.keyVal("y", this.position.y);
-            w.decIndent();
-            w.key("positionAbsolute");
-            w.incIndent();
-            w.keyVal("x", this.positionAbsolute.x);
-            w.keyVal("y", this.positionAbsolute.y);
-            w.decIndent();
-            w.keyVal("selectable", false);
-            w.keyVal("sourcePosition", this.sourcePosition);
-            w.keyVal("targetPosition", this.targetPosition);
-            w.keyVal("type", this.type);
-            w.keyVal("width", this.width);
-            w.key("data");
-            w.incIndent();
-            w.keyQuoted("desc", this.data.desc);
-            w.keyVal("height", this.data.height ?? this.height);
-            w.keyVal("isInIteration", true);
-            w.keySingleQuoted("iteration_id", this.parentId);
-            w.keyVal("selected", false);
-            w.keyQuoted("title", this.data.title);
-            w.keyVal("type", "iteration-start");
-            w.keyVal("width", this.data.width ?? this.width);
-            w.decIndent();
-        });
+    toJSON() {
+        return {
+            id: this.id,
+            type: this.type,
+            parentId: this.parentId,
+            position: { x: this.position.x, y: this.position.y },
+            positionAbsolute: { x: this.positionAbsolute.x, y: this.positionAbsolute.y },
+            width: this.width,
+            height: this.height,
+            selected: this.selected,
+            sourcePosition: this.sourcePosition,
+            targetPosition: this.targetPosition,
+            draggable: false,
+            selectable: false,
+            data: {
+                desc: this.data.desc,
+                height: this.data.height ?? this.height,
+                isInIteration: true,
+                iteration_id: this.parentId,
+                selected: false,
+                title: this.data.title,
+                type: "iteration-start",
+                width: this.data.width ?? this.width,
+            },
+        };
     }
     static fromYAML(raw) {
         const d = raw.data;

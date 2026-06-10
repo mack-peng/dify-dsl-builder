@@ -37,7 +37,6 @@ exports.loadPatch = loadPatch;
 exports.applyPatch = applyPatch;
 const yaml = __importStar(require("js-yaml"));
 const fs = __importStar(require("fs"));
-const edge_1 = require("./edge");
 const code_1 = require("./nodes/code");
 // ── Step appliers ──
 function getKey(s) {
@@ -49,18 +48,17 @@ function applyStep(dsl, raw) {
     switch (key) {
         case "remove-edge": {
             const id = `${val.source}-${val.sourceHandle || "source"}-${val.target}-target`;
-            dsl.graph.removeEdge(id);
-            // Also try with true/false handle
-            dsl.graph.removeEdge(`${val.source}-true-${val.target}-target`);
-            dsl.graph.removeEdge(`${val.source}-false-${val.target}-target`);
+            dsl.removeEdge(id);
+            dsl.removeEdge(`${val.source}-true-${val.target}-target`);
+            dsl.removeEdge(`${val.source}-false-${val.target}-target`);
             break;
         }
         case "remove-node": {
-            dsl.graph.remove(val.id);
+            dsl.removeNode(val.id);
             break;
         }
         case "add-edge": {
-            dsl.graph.addEdge(new edge_1.Edge(val.source, val.target, val.handle || "source"));
+            dsl.addEdge(val.source, val.target, val.handle || "source");
             break;
         }
         case "add-code-node": {
@@ -74,32 +72,32 @@ function applyStep(dsl, raw) {
             if (val.outputs) {
                 node.data.outputs = val.outputs;
             }
-            dsl.graph.add(node);
+            dsl.addNode(node);
             if (val.position)
                 node.setPosition(val.position.x, val.position.y);
             break;
         }
         case "add-classifier-class": {
-            const cls = dsl.graph.findClassifier(val.classifier);
+            const cls = dsl.findClassifier(val.classifier);
             if (cls) {
                 cls.data.classes?.push({ id: val.id, name: val.name, description: "" });
             }
             break;
         }
         case "set-title": {
-            const n = dsl.graph.find(val.id);
+            const n = dsl.getNode(val.id);
             if (n)
                 n.setTitle(val.value);
             break;
         }
         case "set-desc": {
-            const n = dsl.graph.find(val.id);
+            const n = dsl.getNode(val.id);
             if (n)
                 n.setDesc(val.value);
             break;
         }
         case "set-prompt": {
-            const llm = dsl.graph.findLLM(val.id);
+            const llm = dsl.findLLM(val.id);
             if (llm) {
                 for (const msg of llm.data.prompt_template) {
                     if (msg.role === val.role) {
@@ -110,13 +108,13 @@ function applyStep(dsl, raw) {
             break;
         }
         case "set-position": {
-            const n = dsl.graph.find(val.id);
+            const n = dsl.getNode(val.id);
             if (n)
                 n.setPosition(val.x, val.y);
             break;
         }
         case "set-answer": {
-            const a = dsl.graph.findAnswer(val.id);
+            const a = dsl.findAnswer(val.id);
             if (a)
                 a.data.answer = val.answer;
             break;
@@ -134,13 +132,13 @@ function applyStep(dsl, raw) {
             break;
         }
         case "set-code": {
-            const c = dsl.graph.findCode(val.id);
+            const c = dsl.findCode(val.id);
             if (c)
                 c.data.code = c.data.code.replace(val.replace, val.with);
             break;
         }
         case "set-start-var": {
-            const s = dsl.graph.findStart(val.id);
+            const s = dsl.findStart(val.id);
             if (s) {
                 for (const v of s.data.variables) {
                     if (v.variable === val.variable) {

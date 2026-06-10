@@ -1,5 +1,7 @@
 node_modules/
 output/
 input/
+patches/
 *.log
 .DS_Store
+dist-web/

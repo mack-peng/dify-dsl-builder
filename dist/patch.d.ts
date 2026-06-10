@@ -1,4 +1,4 @@
-import { DifyDSL } from "./index";
+import { DifyDSL } from "./core/DifyDSL";
 export declare function loadPatch(filePath: string): {
     steps: Record<string, any>[];
     description?: string;

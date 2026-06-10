@@ -1,8 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BaseNode = void 0;
+/**
+ * New-style BaseNode — no YAMLWriter dependency.
+ * Each subclass implements toJSON() to restore DSL-compatible JSON.
+ */
 class BaseNode {
     id;
+    /** Outer node type: "custom" | "custom-iteration-start" */
     type;
     position;
     positionAbsolute;
@@ -13,6 +18,7 @@ class BaseNode {
     targetPosition;
     zIndex;
     data;
+    // Iteration support (set when node lives inside an iteration)
     parentId;
     isInIteration;
     iterationId;
@@ -28,17 +34,12 @@ class BaseNode {
         this.sourcePosition = "right";
         this.targetPosition = "left";
         this.data = data;
+        this.parentId = opts?.parentId;
     }
     get title() { return this.data.title; }
     get desc() { return this.data.desc; }
-    setTitle(title) {
-        this.data.title = title;
-        return this;
-    }
-    setDesc(desc) {
-        this.data.desc = desc;
-        return this;
-    }
+    setTitle(v) { this.data.title = v; return this; }
+    setDesc(v) { this.data.desc = v; return this; }
     setPosition(x, y) {
         this.position = { x, y };
         this.positionAbsolute = { x, y };
@@ -53,38 +54,12 @@ class BaseNode {
         this.zIndex = z;
         return this;
     }
-    clearZIndex() {
-        this.zIndex = undefined;
-        return this;
-    }
-    /** Build the outer JSON shell shared by all nodes. Subclasses call this from toJSON(). */
-    outerJSON(dataBlock) {
-        const out = {
-            id: this.id, type: this.type,
-            position: { x: this.position.x, y: this.position.y },
-            positionAbsolute: { x: this.positionAbsolute.x, y: this.positionAbsolute.y },
-            width: this.width, height: this.height,
-            selected: this.selected,
-            sourcePosition: this.sourcePosition,
-            targetPosition: this.targetPosition,
-            data: dataBlock,
-        };
-        if (this.zIndex !== undefined)
-            out.zIndex = this.zIndex;
-        if (this.parentId)
-            out.parentId = this.parentId;
-        if (this.type === "custom-iteration-start") {
-            out.draggable = false;
-            out.selectable = false;
-        }
-        return out;
-    }
-    /** Build the data block stub shared by all nodes. Subclasses extend this. */
-    dataJSON(extra) {
+    /** Build JSON for the `data` block (shared boilerplate). Subclasses extend it. */
+    dataToJSON(extra) {
         const base = {
-            desc: this.desc,
-            selected: this.selected,
-            title: this.title,
+            desc: this.data.desc,
+            selected: this.data.selected,
+            title: this.data.title,
             type: this.data.type,
         };
         if (this.isInIteration) {
@@ -95,13 +70,29 @@ class BaseNode {
             Object.assign(base, extra);
         return base;
     }
-    /** Serialize this node to a plain JSON object (DSL-compatible). */
-    toJSON() {
-        // Default fallback — subclasses should override.
-        return this.outerJSON(this.dataJSON());
-    }
-    static fromYAML(raw) {
-        throw new Error("fromYAML not implemented");
+    /** Build the outer node JSON shared by all subclasses */
+    outerToJSON(dataObj) {
+        const out = {
+            id: this.id,
+            type: this.type,
+            position: { x: this.position.x, y: this.position.y },
+            positionAbsolute: { x: this.positionAbsolute.x, y: this.positionAbsolute.y },
+            width: this.width,
+            height: this.height,
+            selected: this.selected,
+            sourcePosition: this.sourcePosition,
+            targetPosition: this.targetPosition,
+            data: dataObj,
+        };
+        if (this.zIndex !== undefined)
+            out.zIndex = this.zIndex;
+        if (this.parentId)
+            out.parentId = this.parentId;
+        if (this.type === "custom-iteration-start") {
+            out.draggable = false;
+            out.selectable = false;
+        }
+        return out;
     }
 }
 exports.BaseNode = BaseNode;

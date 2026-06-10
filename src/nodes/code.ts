@@ -1,6 +1,5 @@
 import { BaseNode } from "./base";
-import { XY, BaseNodeData, NodeVariable, CodeOutput, IfCase, ClassDefinition, ParamSchema, ToolParamValue, ModelConfig } from "../types/common";
-import { YAMLWriter } from "../serializer";
+import { XY, BaseNodeData, NodeVariable, CodeOutput } from "../types/common";
 
 interface CodeNodeData extends BaseNodeData {
   type: "code";
@@ -19,41 +18,57 @@ export class CodeNode extends BaseNode<CodeNodeData> {
     }, { height: data?.code ? Math.max(90, data.code.split("\n").length * 20) : 90 });
   }
 
-  toYAML(w: YAMLWriter): void {
-    w.listItem(() => {
-      this.writeDataHead(w);
-      w.blockScalar("code", this.data.code);
-      w.keyVal("code_language", this.data.code_language);
-      // outputs
-      w.key("outputs");
-      w.incIndent();
-      Object.entries(this.data.outputs).forEach(([name, out]) => {
-        w.key(name);
-        w.incIndent();
-        w.key("children");
-        w.keyVal("type", out.type);
-        w.decIndent();
-      });
-      w.decIndent();
-      // variables
-      w.key("variables");
-      w.incIndent();
-      this.data.variables.forEach(v => {
-        w.listItem(() => {
-          w.key("value_selector");
-          w.incIndent();
-          w.raw(`- '${v.value_selector[0]}'`);
-          w.raw(`- ${v.value_selector[1]}`);
-          w.decIndent();
-          if (v.value_type) w.keyVal("value_type", v.value_type);
-          w.keyVal("variable", v.variable);
-        });
-      });
-      w.decIndent();
-      this.closeData(w);
-      this.writeOuter(w);
-    });
+  toJSON(): Record<string, unknown> {
+    const outputs: Record<string, unknown> = {};
+    for (const [name, out] of Object.entries(this.data.outputs)) {
+      outputs[name] = { children: null, type: out.type };
+    }
+    return this.outerJSON(this.dataJSON({
+      code: this.data.code,
+      code_language: this.data.code_language,
+      outputs,
+      variables: this.data.variables.map(v => {
+        const obj: Record<string, unknown> = {
+          variable: v.variable,
+          value_selector: [v.value_selector[0], v.value_selector[1]],
+        };
+        if (v.value_type) obj.value_type = v.value_type;
+        return obj;
+      }),
+    }));
   }
+
+  // ─── Methods ───
+  setCode(lang: "python3" | "javascript", code: string): this {
+    this.data.code_language = lang;
+    this.data.code = code;
+    return this;
+  }
+
+  addVariable(v: NodeVariable): this {
+    this.data.variables.push(v);
+    return this;
+  }
+
+  removeVariable(name: string): this {
+    this.data.variables = this.data.variables.filter(x => x.variable !== name);
+    return this;
+  }
+
+  addOutput(name: string, type: string): this {
+    this.data.outputs[name] = { type, children: null };
+    return this;
+  }
+
+  removeOutput(name: string): this {
+    delete this.data.outputs[name];
+    return this;
+  }
+
+  get code(): string { return this.data.code; }
+  get codeLanguage(): string { return this.data.code_language; }
+  get inputVariables(): NodeVariable[] { return this.data.variables; }
+  get outputDefs(): Record<string, CodeOutput> { return this.data.outputs; }
 
   static override fromYAML(raw: Record<string, unknown>): CodeNode {
     const d = raw.data as Record<string, unknown>;
@@ -67,6 +82,7 @@ export class CodeNode extends BaseNode<CodeNodeData> {
     node.setPosition((raw.position as XY).x, (raw.position as XY).y);
     node.width = raw.width as number;
     node.height = raw.height as number;
+    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
     return node;
   }
 }

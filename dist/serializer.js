@@ -157,12 +157,13 @@ class YAMLWriter {
         return false;
     }
     keySingleQuoted(k, v) {
+        const escaped = v.replace(/'/g, "''");
         if (this._firstInListItem) {
             this._firstInListItem = false;
-            this.lines.push(`${this.parentSpaces()}- ${k}: '${v}'`);
+            this.lines.push(`${this.parentSpaces()}- ${k}: '${escaped}'`);
         }
         else {
-            this.lines.push(`${this.spaces}${k}: '${v}'`);
+            this.lines.push(`${this.spaces}${k}: '${escaped}'`);
         }
         return this;
     }

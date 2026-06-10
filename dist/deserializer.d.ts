@@ -19,6 +19,7 @@ export declare function load(yamlStr: string): {
         value_type?: string;
         description?: string;
     }[];
+    ragVariables: unknown[];
 };
 export declare function loadFromFile(filePath: string): {
     version: string;
@@ -38,4 +39,5 @@ export declare function loadFromFile(filePath: string): {
         value_type?: string;
         description?: string;
     }[];
+    ragVariables: unknown[];
 };

@@ -15,44 +15,44 @@ npm run build
 # Show help
 npm run run src/cli.ts --help
 
-# Roundtrip test (load → save → validate)
-npm run run src/cli.ts roundtrip input/app.yml output/app.yml
-
-# Validate a DSL file
-npm run run src/cli.ts validate input/app.yml
-
 # Show node/edge stats
 npm run run src/cli.ts info input/app.yml
 
-# Apply a patch
+# Roundtrip test (parse → toYAML → save)
+npm run run src/cli.ts roundtrip input/app.yml output/roundtrip.yml
+
+# Apply a YAML patch
 npm run run src/cli.ts apply patches/gaokao-v3.yml -i input/app.yml -o output/patched.yml
 ```
 
-## Library API
+## Library API (quick start)
 
 ```ts
-import { DifyDSL, Edge, CodeNode } from "dify-dsl-builder";
+import { DifyDSL } from "dify-dsl-builder";
+import * as fs from "fs";
 
-// Load
-const dsl = DifyDSL.load("input/app.yml");
+// ①+② Parse YAML → typed index
+const yamlStr = fs.readFileSync("input/app.yml", "utf-8");
+const dsl = DifyDSL.parse(yamlStr);
 
-// Inspect
-console.log(dsl.mode);           // "workflow" | "advanced-chat"
-console.log(dsl.graph.nodeCount);
-const start = dsl.graph.find("start-node-id");
-const llm = dsl.graph.findLLM("llm-node-id");
+// ④ CRUD — O(1) lookups
+const node = dsl.getNode("node-id");
+const llms = dsl.findByType("llm");
+const prev = dsl.getPrevIds("node-id");
+const next = dsl.getNextIds("node-id");
 
-// Mutate
-dsl.graph.add(new CodeNode("new-code", { title: "My Code", code: "print(1)" }));
-dsl.graph.addEdge(new Edge("start-node-id", "new-code"));
-dsl.setEnv("API_KEY", "12345", "string");
+dsl.addNode(new CodeNode("new-id", { title: "My Code", code: "print(1)" }));
+dsl.removeNode("old-node-id");    // auto-removes related edges
+dsl.addEdge("source-id", "target-id");
 
-// Validate
-const report = dsl.validate();
-if (!report.ok) console.error(report.errors);
+// ⑤ Node-level modifications
+node?.setTitle("New Title");
+node?.setPosition(100, 200);
 
-// Save
-dsl.save("output/app.yml");
+// ⑥+⑦ Serialize
+const json = dsl.toJSON();    // plain object
+const yaml = dsl.toYAML();    // yaml.dump → string
+fs.writeFileSync("output.yml", yaml);
 ```
 
 ## Patch files
@@ -69,21 +69,21 @@ steps:
 
 ## Node types
 
-| Type string | Class |
-|---|---|
-| `start` | `StartNode` |
-| `answer` | `AnswerNode` |
-| `llm` | `LLMNode` |
-| `code` | `CodeNode` |
-| `knowledge-retrieval` | `KnowledgeNode` |
-| `if-else` | `IfElseNode` |
-| `template-transform` | `TemplateNode` |
-| `variable-aggregator` | `AggregatorNode` |
-| `iteration` | `IterationNode` |
-| `tool` | `ToolNode` |
-| `question-classifier` | `ClassifierNode` |
-| `http-request` | `HTTPNode` |
-| `document-extractor` | `DocNode` |
+| Type string | Class | Key methods |
+|-------------|-------|-------------|
+| `start` | `StartNode` | `addVariable(v)`, `removeVariable(n)`, `updateVariable(n,patch)` |
+| `answer` | `AnswerNode` | `setAnswer(tpl)`, `addVariableRef(id,f)` |
+| `llm` | `LLMNode` | `setModel(p,n)`, `setTemperature(t)`, `addPromptMessage(m)`, `setMemory(n)` |
+| `code` | `CodeNode` | `setCode(lang,code)`, `addVariable(v)`, `addOutput(name,type)` |
+| `knowledge-retrieval` | `KnowledgeNode` | `addDataset(id)`, `setQuerySelector(id,f)`, `setTopK(n)` |
+| `if-else` | `IfElseNode` | `addCase(c)`, `updateCondition(caseId,idx,patch)` |
+| `template-transform` | `TemplateNode` | `setTemplate(tpl)`, `addVariable(v)` |
+| `variable-aggregator` | `AggregatorNode` | `addSource(id,f)`, `removeSource(id)`, `setOutputType(t)` |
+| `iteration` | `IterationNode` | `addChild(n)`, `removeChild(id)`, `setIterator(id,f)` |
+| `tool` | `ToolNode` | `setPlugin(id,uid)`, `setToolParam(k,v)`, `setToolConfig(k,v)` |
+| `question-classifier` | `ClassifierNode` | `addClass(c)`, `setModel(p,n)`, `setInstructions(s)` |
+| `http-request` | `HTTPNode` | (stub) |
+| `document-extractor` | `DocNode` | (stub) |
 
 ## License
 

@@ -13,29 +13,56 @@ No linter, formatter, tests, or CI.
 
 ```
 npm run run src/cli.ts <command> ...   # tsx, no build required
-npx tsx examples/gaokao_v3.ts          # run an example directly
 ```
 
 After `npm run build`, the CLI is available as `dify-dsl-cli` (`package.json#bin`).
+
+## Web debug page
+
+```
+npm run web:dev     # webpack dev server at http://localhost:3000
+npm run web:build   # production bundle → dist-web/
+```
 
 ## Architecture
 
 Reads/manipulates/writes **Dify DSL YAML** (`app.yml` exported from Dify Studio).
 
-- **Entry point**: `DifyDSL` in `src/index.ts` — `load(file)` / `save(file)`
-- **Graph**: `src/graph.ts` — `Map<id, AnyNode>` + `Edge[]`. `find()` searches top-level first, then recurses into `IterationNode.children`
-- **Nodes**: `src/nodes/` — each has `toYAML()` / `static fromYAML()`. `NODE_TYPE_MAP` in `src/nodes/index.ts` maps type strings → constructors
-- **YAML serializer**: Custom `YAMLWriter` (`src/serializer.ts`). Writing does NOT use js-yaml — builds a string line-by-line. js-yaml is for reading only (`src/deserializer.ts`)
-- **Patch system**: `src/patch.ts` loads a YAML patch file (`steps:` array) and applies it declaratively — `apply` CLI command + `patches/` directory
-- **Validator**: `src/validator.ts` — structural checks (cycles, orphans, handles, refs). Called via `dsl.validate()` or CLI `apply`
+### 7-step pipeline
 
-## Deserialization (3-pass)
+```
+① parse(yamlStr)   → raw JSON (js-yaml.load)
+② index()          → NodeIndex (typed nodes + edges)
+③ (implicit)       → edges provide connectivity
+④ CRUD             → getNode / addNode / removeNode / updateNode
+⑤ Node.methods()   → instance modifications
+⑥ toJSON()         → Dify DSL JSON plain object
+⑦ toYAML()         → yaml.dump(json, {...})
+```
 
-1. Build top-level nodes (skip `iteration-start` and nodes with `parentId`)
-2. Wire iteration-start nodes → parent `IterationNode`, attach remaining children
-3. Build edges
+### Core files
 
-Iteration children serialize inline with their parent's `toYAML()`.
+- **`core/DifyDSL.ts`** — main class: `DifyDSL.parse()`, CRUD, `toJSON()`, `toYAML()`
+- **`core/NodeIndex.ts`** — O(1) index: `Map<id, Node>`, `Map<type, Set<id>>`, edge adjacency maps
+- **`core/types.ts`** — shared types: `DifyDSLJSON`, `EdgeData`, `Viewport`
+- **`nodes/base.ts`** — `BaseNode<T>` with `outerJSON()` / `dataJSON()` helpers
+- **`nodes/`** — each node type has `toJSON()` + typed modification methods + `static fromYAML()`
+- **`patch.ts`** — YAML patch file loader and applier
+
+### Key design decisions
+
+- **No `previous`/`next` on nodes** — connectivity is in `NodeIndex.outEdges` / `inEdges`, queried via `dsl.getPrevIds(id)` / `dsl.getNextIds(id)`. Deleting a node auto-removes related edges.
+- **`toJSON()` not `toYAML()`** — each node produces a plain JSON object; final YAML is `yaml.dump(toJSON())`, no hand-written string builder.
+- **`serializer.ts` / `YAMLWriter` / `graph.ts` / `deserializer.ts` / `edge.ts` / `features.ts` / `validator.ts`** — all deleted in the refactor.
+
+### O(1) lookups
+
+| Method | Complexity |
+|--------|-----------|
+| `dsl.getNode(id)` | O(1) — `Map.get` |
+| `dsl.findByType(type)` | O(1) to find set + O(n) to iterate |
+| `dsl.getPrevIds(id)` / `dsl.getNextIds(id)` | O(1) — edge adjacency maps |
+| `dsl.getNodeEdges(id)` | O(1) per edge list |
 
 ## CLI behaviors
 
@@ -47,52 +74,6 @@ Iteration children serialize inline with their parent's `toYAML()`.
 
 - `input/` and `output/` are gitignored — throwaway fixtures
 - `patches/` is tracked — reusable patch files
-
-## Serializer pitfalls
-
-### `w.key()` vs `w.keyVal()`
-
-- `w.keyVal(k, v)` — key + value (use for `null` too)
-- `w.key(k)` then `w.incIndent()` — key opens a nested block
-
-**Never** use `w.key(k)` without a following `w.incIndent()` — drops the value.
-
-### Value type coercion
-
-| Method | Output |
-|--------|--------|
-| `w.keyVal(k, v)` | bare YAML (numbers stay numbers) |
-| `w.keyQuoted(k, v)` | double-quoted, auto-escapes `\n` `"` |
-| `w.keySingleQuoted(k, s)` | single-quoted |
-| `w.blockScalar(k, s)` | `\|`/`\|-` for multiline |
-
-Common mistake: converting a number to string then quoting it.
-
-```ts
-// BROKEN — `0.8` becomes `value: '0.8'` (string)
-w.keySingleQuoted("value", String(v.value));
-// CORRECT
-if (typeof v.value === "number") w.keyVal("value", v.value);
-else w.keySingleQuoted("value", String(v.value));
-```
-
-For nullable fields with mixed types, use the `writeParamValue` helper (`tools.ts:7`).
-
-### Verifying roundtrip correctness
-
-```
-1. DifyDSL.load(in).save(out)   — no errors
-2. ruby scripts/validate-dsl.rb out   — "全部通过"
-3. yaml.load(in) ≈ yaml.load(out)   — deep-compare types (number ≠ string)
-```
-
-## Validating output
-
-```
-ruby scripts/validate-dsl.rb output/xxx.yml
-```
-
-Full structural validation: node types, edge rules, cycles, variable references, VA consistency, mode checks.
 
 ## References
 

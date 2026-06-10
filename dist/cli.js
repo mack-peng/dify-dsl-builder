@@ -55,12 +55,14 @@ Inspect commands:
   node list  <file> [type]       Tabular listing, optional type filter
 
 Atomic commands (modify file in place):
-  node set-title   <file> <id> <title>
-  node set-desc    <file> <id> <desc>
-  node set-prompt  <file> <id> <role> <replace> <with>
-  edge add         <file> <src> <tgt> [handle]
-  edge remove      <file> <src> <tgt> [handle]
-  remove           <file> <id>
+  node set-title      <file> <id> <title>
+  node set-desc       <file> <id> <desc>
+  node set-prompt     <file> <id> <role> <replace> <with>
+  node set-code       <file> <id> <replace> <with>
+  node set-condition  <file> <id> <case_id> <field> <value>
+  edge add            <file> <src> <tgt> [handle]
+  edge remove         <file> <src> <tgt> [handle]
+  remove              <file> <id>
 `;
 function fail(msg) {
     console.error(msg);
@@ -217,17 +219,23 @@ function cmd_flow(args) {
 }
 // ── node show ──
 function cmdNodeShow(args) {
-    const file = resolvePath(args[0]);
-    const id = args[1];
+    const useJson = args.includes("--json");
+    const fileArgs = args.filter(a => a !== "--json");
+    const file = resolvePath(fileArgs[0]);
+    const id = fileArgs[1];
     if (!fs.existsSync(file))
         fail(`File not found: ${file}`);
     if (!id)
-        fail("Usage: dify-dsl-cli node show <file> <id>");
+        fail("Usage: dify-dsl-cli node show <file> <id> [--json]");
     const str = fs.readFileSync(file, "utf-8");
     const dsl = DifyDSL_1.DifyDSL.parse(str);
     const n = dsl.getNode(id);
     if (!n)
         fail(`Node not found: ${id}`);
+    if (useJson) {
+        console.log(JSON.stringify(n.toJSON(), null, 2));
+        return;
+    }
     const data = n.data;
     const type = data.type;
     console.log(`=== ${n.id} ===`);
@@ -607,6 +615,44 @@ function atomRemove(args) {
         dsl.removeNode(args[1]);
     });
 }
+function atomNodeSetCondition(args) {
+    atomicNode(args, 0, (dsl) => {
+        const n = dsl.getNode(args[1]);
+        if (!n)
+            fail(`Node not found: ${args[1]}`);
+        const caseId = args[2];
+        const field = args[3];
+        const value = args[4];
+        const cases = n.data.cases;
+        if (!cases)
+            fail(`Node ${args[1]} has no cases`);
+        const cs = cases.find((c) => c.case_id === caseId);
+        if (!cs)
+            fail(`Case '${caseId}' not found`);
+        const cond = cs.conditions?.[0];
+        if (!cond)
+            fail(`No condition in case '${caseId}'`);
+        const fields = field.split(".");
+        if (fields.length === 1) {
+            cond[field] = value;
+        }
+        else {
+            let obj = cond;
+            for (let i = 0; i < fields.length - 1; i++)
+                obj = obj[fields[i]];
+            if (obj)
+                obj[fields[fields.length - 1]] = value;
+        }
+    });
+}
+function atomNodeSetCode(args) {
+    atomicNode(args, 0, (dsl) => {
+        const c = dsl.findCode(args[1]);
+        if (!c)
+            fail(`Code node not found: ${args[1]}`);
+        c.data.code = c.data.code.replace(args[2], args[3]);
+    });
+}
 // ── Main ──
 async function main() {
     const cmd = process.argv[2];
@@ -662,8 +708,8 @@ async function main() {
             if (args.length < 1)
                 fail("Usage: dify-dsl-cli node <subcommand> ...");
             if (args[0] === "show") {
-                if (args.length < 3)
-                    fail("Usage: dify-dsl-cli node show <file> <id>");
+                if (args.length < 2)
+                    fail("Usage: dify-dsl-cli node show <file> <id> [--json]");
                 cmdNodeShow(args.slice(1));
             }
             else if (args[0] === "list") {
@@ -685,6 +731,16 @@ async function main() {
                 if (args.length < 5)
                     fail("Usage: dify-dsl-cli node set-prompt <file> <id> <role> <replace> <with>");
                 atomNodeSetPrompt(args.slice(1));
+            }
+            else if (args[0] === "set-code") {
+                if (args.length < 4)
+                    fail("Usage: dify-dsl-cli node set-code <file> <id> <replace> <with>");
+                atomNodeSetCode(args.slice(1));
+            }
+            else if (args[0] === "set-condition") {
+                if (args.length < 5)
+                    fail("Usage: dify-dsl-cli node set-condition <file> <id> <case_id> <field> <value>");
+                atomNodeSetCondition(args.slice(1));
             }
             else {
                 fail(`Unknown node subcommand: ${args[0]}`);

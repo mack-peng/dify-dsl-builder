@@ -18,14 +18,9 @@ npx dify-dsl-cli <command> ...
 
 ### For LLM Agents
 
-When working in this repo (clone + dev), fetch the guides:
+AI Agent 请首先阅读 [`docs/guide/installation.md`](docs/guide/installation.md) 中的 **第 0 节「AI Agent 工作流指南」**，了解如何分析需求、选择原子命令还是 patch、确认后执行。
 
-```bash
-curl -s https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/guide/installation.md
-curl -s https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/guide/patch.md
-```
-
-实现需求时优先使用 YAML Patch 系统，编写描述文件优于直接写 TypeScript 代码。
+实现需求时优先使用 YAML Patch 系统（[`docs/guide/patch.md`](docs/guide/patch.md)），编写描述文件优于直接写 TypeScript 代码。
 
 ---
 

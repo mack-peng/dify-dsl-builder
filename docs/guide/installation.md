@@ -4,6 +4,107 @@
 
 ---
 
+## 0. AI Agent 工作流指南
+
+如果你是一个 AI Agent（在 Claude Code、OpenCode、Cursor、Codex 等工具中运行），请按以下流程工作。
+
+### 0.1 环境准备
+
+```bash
+# 在用户项目的 agent 目录中安装
+mkdir -p agent && cd agent
+npm install @orangemust/dify-dsl-builder
+```
+
+阅读参考资料了解 DSL 结构和 Patch 编写方式：
+
+- `node_modules/@orangemust/dify-dsl-builder/docs/guide/patch.md` — Patch 全部 17 种操作
+- `node_modules/@orangemust/dify-dsl-builder/references/dify-dsl-reference.md` — Dify DSL schema 参考
+- `node_modules/@orangemust/dify-dsl-builder/examples/patch-all-steps.yml` — 示例
+
+### 0.2 工作流
+
+用户会提供两个文件：
+
+1. **DSL 描述文件** — 现有的 Dify 应用导出 `.yml`
+2. **需求文档** — `.md` 格式，描述需要做什么修改
+
+你的工作流程：
+
+```
+① 读取 DSL .yml → dify-dsl-cli info <file> 了解结构
+② 阅读需求文档 → 逐条分析每条需求
+③ 做出技术方案 → 判断每条需求应如何处理
+④ 选择执行方式：
+   ├── 简单修改（改标题/描述/删除节点…）→ 直接用原子命令
+   └── 复杂修改（多条/涉及结构…） → 编写 YAML patch 文件
+⑤ 与用户确认方案后执行
+```
+
+### 0.3 简单修改：原子命令
+
+适合单条、直接的操作，直接在 CLI 执行：
+
+```bash
+# 修改节点标题
+npx dify-dsl-cli node set-title workflow.yml "node-id" "新标题"
+
+# 修改节点描述
+npx dify-dsl-cli node set-desc workflow.yml "node-id" "新描述"
+
+# 删除节点（自动清理关联边）
+npx dify-dsl-cli remove workflow.yml "node-id"
+
+# 添加边
+npx dify-dsl-cli edge add workflow.yml "source-id" "target-id"
+
+# 删除边
+npx dify-dsl-cli edge remove workflow.yml "source-id" "target-id"
+
+# 替换 LLM prompt 中的文本
+npx dify-dsl-cli node set-prompt workflow.yml "llm-id" "system" "旧文本" "新文本"
+```
+
+### 0.4 复杂修改：YAML Patch 文件
+
+当需求涉及多条修改、结构调整或批量操作时，编写 patch 文件：
+
+```yaml
+description: "补丁描述 — 说明做了什么"
+steps:
+  - set-title: { id: "node-1", value: "新标题" }
+  - set-prompt: { id: "llm-1", role: "system", replace: "旧", with: "新" }
+  - remove-node: { id: "node-old" }
+  - add-code-node:
+      id: "new-code"
+      title: "新增节点"
+      code: "def main(): return {}"
+  - add-edge: { source: "new-code", target: "answer-node" }
+  - env-set: { name: "API_KEY", value: "xxx", type: "string" }
+  - conv-set: { name: "user_profile", value_type: "string" }
+```
+
+全部 17 种操作参见 `patch.md`。编写完成后：
+
+1. 将 patch 内容展示给用户确认
+2. 用户确认后执行：
+
+```bash
+npx dify-dsl-cli apply patch.yml -i input.yml -o output.yml
+```
+
+apply 命令会自动执行 `validate()` 校验，不通过则退出并报告错误。
+
+### 0.5 执行规范
+
+- **先看后改**：必须先用 `dify-dsl-cli info` 了解现有 DSL 结构，再决定如何修改
+- **原子命令不改原文件位置**：原地修改 .yml 后，建议先让用户导入 Dify 验证
+- **patch 输出到新文件**：用 `-o output.yml` 新文件，保留原始文件不污染
+- **patch 只包含修改**：不要尝试用 patch 重新生成整个 DSL，patch 仅描述增量修改
+- **不确定的先问**：对 DSL 结构或 patch 操作参数有疑问时，先查 `dify-dsl-reference.md` 或问用户
+
+---
+
 ## 1. 安装
 
 ### 方式一：npm 全局安装（推荐用于 CLI）

@@ -24,6 +24,10 @@ npm run web:dev     # webpack dev server at http://localhost:8300
 npm run web:build   # production bundle → dist-web/
 ```
 
+`tsconfig.web.json` extends `tsconfig.json` with `module: "ESNext"`, `moduleResolution: "bundler"`, `jsx: "react-jsx"`, and `lib: ["DOM"]`.
+
+The dev server hardcodes `/api/load` to read `input/高考志愿推荐助手.yml` and `/api/save` to write `output/web-output.yml`. Both paths are relative to the project root, not configurable.
+
 ## Architecture
 
 Reads/manipulates/writes **Dify DSL YAML** (`app.yml` exported from Dify Studio).
@@ -53,7 +57,8 @@ Reads/manipulates/writes **Dify DSL YAML** (`app.yml` exported from Dify Studio)
 
 - **No `previous`/`next` on nodes** — connectivity is in `NodeIndex.outEdges` / `inEdges`, queried via `dsl.getPrevIds(id)` / `dsl.getNextIds(id)`. Deleting a node auto-removes related edges.
 - **`toJSON()` not `toYAML()`** — each node produces a plain JSON object; final YAML is `yaml.dump(toJSON())`, no hand-written string builder.
-- **`serializer.ts` / `YAMLWriter` / `graph.ts` / `deserializer.ts` / `edge.ts` / `features.ts` / `validator.ts`** — all deleted in the refactor.
+- **Two-pass node building** in `DifyDSL.parse()`: pass 1 builds top-level nodes, pass 2 wires iteration-start + children (`parentId` nodes) to their parent `IterationNode`. Iteration children are tracked in `NodeIndex.byParent`.
+- **Edge IDs** follow convention: `{source}-{sourceHandle}-{target}-target`
 
 ### O(1) lookups
 
@@ -64,16 +69,18 @@ Reads/manipulates/writes **Dify DSL YAML** (`app.yml` exported from Dify Studio)
 | `dsl.getPrevIds(id)` / `dsl.getNextIds(id)` | O(1) — edge adjacency maps |
 | `dsl.getNodeEdges(id)` | O(1) per edge list |
 
+- **Two different type files**: `src/types/common.ts` (internal node data types — `BaseNodeData`, `NodeVariable`, etc.) and `src/core/types.ts` (DSL-level JSON shape types — `DifyDSLJSON`, `EdgeData`, etc.). Don't confuse them.
+
 ## CLI behaviors
 
-- `roundtrip` / `validate` try to shell out to `dify-builder-agent/scripts/validate-dsl.rb` (external sibling repo). Errors are caught and printed, not fatal
+- `roundtrip` / `validate` try to shell out to `dify-builder-agent/scripts/validate-dsl.rb` (external sibling repo). Errors are caught and printed, not fatal. A local copy exists at `scripts/validate-dsl.rb` but is NOT used by the CLI — it always looks for the sibling repo.
 - `apply` runs `dsl.validate()` after patching, exits non-zero on validation errors
 - Atomic commands (`node set-title`, `edge add`, etc.) modify the file in place
 
 ## Input/output conventions
 
 - `input/` and `output/` are gitignored — throwaway fixtures
-- `patches/` is tracked — reusable patch files
+- `patches/` is also gitignored — reusable patch files live in `examples/`
 
 ## References
 

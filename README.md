@@ -1,109 +1,75 @@
 # dify-dsl-builder
 
-TypeScript library for reading, manipulating, and writing [Dify](https://dify.ai) DSL YAML files (`app.yml`).
+CLI tool and TypeScript library for reading, manipulating, and writing [Dify](https://dify.ai) DSL YAML files (`app.yml`).
 
 ---
 
 ## Installation
 
-### For Humans
+```bash
+npm install -g dify-dsl-builder
+```
 
-Copy and paste this to your LLM agent (Claude Code, Cursor, Codex, etc.):
+Or use via npx without installing:
 
-> Install and set up dify-dsl-builder by following the instructions here:
-> https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/guide/installation.md
-
-Or read the [Installation Guide](docs/guide/installation.md) yourself.
+```bash
+npx dify-dsl-cli <command> ...
+```
 
 ### For LLM Agents
 
-Fetch the installation guide and patch guide:
+When working in this repo (clone + dev), fetch the guides:
 
 ```bash
 curl -s https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/guide/installation.md
 curl -s https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/guide/patch.md
 ```
 
-实现需求时优先使用 YAML Patch 系统（`docs/guide/patch.md`），编写描述文件优于直接写 TypeScript 代码。
+实现需求时优先使用 YAML Patch 系统，编写描述文件优于直接写 TypeScript 代码。
 
-## Quick Start
+---
+
+## CLI Commands
+
+```
+dify-dsl-cli <command> [options]
+
+Commands:
+  info       <file>              Print node/edge stats
+  roundtrip  <input> [output]    Parse → save, verify round-trip
+  validate   <file>              Run Ruby DSL validator (external script)
+  apply      <patch> -i <in> -o <out>  Apply YAML patch file
+  remove     <file> <id>         Remove a node
+
+Atomic commands (modify file in place):
+  node set-title   <file> <id> <title>
+  node set-desc    <file> <id> <desc>
+  node set-prompt  <file> <id> <role> <replace> <with>
+  edge add         <file> <src> <tgt> [handle]
+  edge remove      <file> <src> <tgt> [handle]
+```
+
+### Examples
 
 ```bash
-npm ci
-npm run build
+# Inspect a DSL file
+dify-dsl-cli info my-workflow.yml
 
-# CLI
-npx tsx src/cli.ts info input/高考志愿推荐助手.yml
+# Apply a YAML patch
+dify-dsl-cli apply my-patch.yml -i input.yml -o output.yml
 
-# Web debug
-npm run web:dev    # http://localhost:8300
+# Modify a node title in place
+dify-dsl-cli node set-title workflow.yml "node-id" "新标题"
+
+# Add an edge
+dify-dsl-cli edge add workflow.yml "source-id" "target-id"
 ```
 
-## Library API
+---
 
-```ts
-import { DifyDSL } from "dify-dsl-builder";
-import * as fs from "fs";
+## YAML Patch System
 
-// ①+② Parse YAML → typed index
-const yamlStr = fs.readFileSync("input/app.yml", "utf-8");
-const dsl = DifyDSL.parse(yamlStr);
-
-// ④ CRUD — O(1) lookups
-const node = dsl.getNode("node-id");
-const llms = dsl.findByType("llm");
-const prev = dsl.getPrevIds("node-id");
-const next = dsl.getNextIds("node-id");
-
-dsl.addNode(new CodeNode("new-id", { title: "My Code", code: "print(1)" }));
-dsl.removeNode("old-node-id");    // auto-removes related edges
-dsl.addEdge("source-id", "target-id");
-
-// ⑤ Node-level modifications
-node?.setTitle("New Title");
-node?.setPosition(100, 200);
-
-// ⑥+⑦ Serialize
-const json = dsl.toJSON();    // plain object
-const yaml = dsl.toYAML();    // yaml.dump → string
-fs.writeFileSync("output.yml", yaml);
-```
-
-## 节点创建
-
-所有节点构造器都是 `new XxxNode(id, data?)`，构造后用 `dsl.addNode(node)` 添加到 DSL。
-完整构造参数见 `docs/guide/installation.md#4-节点创建`。
-
-```ts
-import { CodeNode, LLMNode, StartNode, AnswerNode } from "dify-dsl-builder";
-
-// Code 节点
-const code = new CodeNode("my-code", {
-  title: "处理数据",
-  code: `def main(x: str) -> dict:\n  return {"r": x}`,
-  code_language: "python3",
-  variables: [{ variable: "x", value_selector: ["upstream", "text"] }],
-});
-code.addOutput("r", "string");
-dsl.addNode(code);
-
-// LLM 节点
-const llm = new LLMNode("my-llm", {
-  title: "智能分析",
-  model: { provider: "openai", name: "gpt-4o", mode: "chat", completion_params: {} },
-  prompt_template: [{ role: "system", text: "You are helpful." }],
-  context: { enabled: false, variable_selector: [] },
-  vision: { enabled: false },
-});
-dsl.addNode(llm);
-```
-
-## YAML Patch 系统
-
-使用 YAML patch 文件声明式地修改 DSL。**实现需求时首选 patch 方式**——编写描述文件优于直接写 TypeScript 代码。
-
-- **编写指南**：[`docs/guide/patch.md`](docs/guide/patch.md) — 全部 17 种操作、参数说明、典型模式
-- **示例文件**：[`examples/patch-all-steps.yml`](examples/patch-all-steps.yml) — 每种操作一个例子
+Declaratively modify Dify DSL via YAML patch files. **17 operations** — see full guide at [`docs/guide/patch.md`](docs/guide/patch.md).
 
 ```yaml
 description: 我的补丁
@@ -113,29 +79,48 @@ steps:
   - add-edge: { source: "new-node", target: "answer-node" }
 ```
 
-应用：
+---
 
-```bash
-npx tsx src/cli.ts apply examples/patch-all-steps.yml \
-  -i input/高考志愿推荐助手.yml \
-  -o output/patched.yml
+## Library API
+
+```ts
+import { DifyDSL } from "dify-dsl-builder";
+import * as fs from "fs";
+
+const dsl = DifyDSL.parse(fs.readFileSync("app.yml", "utf-8"));
+
+// CRUD — O(1) lookups
+const node = dsl.getNode("node-id");
+const llms = dsl.findByType("llm");
+dsl.getPrevIds("node-id");
+dsl.getNextIds("node-id");
+
+dsl.addEdge("source-id", "target-id");
+dsl.removeNode("old-node-id");  // auto-removes related edges
+
+// Serialize
+fs.writeFileSync("output.yml", dsl.toYAML());
 ```
 
-## Node types
+Full API reference: [`docs/guide/installation.md`](docs/guide/installation.md)
+
+---
+
+## Node Types
 
 | Type string | Class | Key methods |
 |-------------|-------|-------------|
-| `start` | `StartNode` | `addVariable(v)`, `removeVariable(n)`, `updateVariable(n,patch)` |
+| `start` | `StartNode` | `addVariable(v)`, `removeVariable(n)` |
 | `answer` | `AnswerNode` | `setAnswer(tpl)`, `addVariableRef(id,f)` |
-| `llm` | `LLMNode` | `setModel(p,n)`, `setTemperature(t)`, `addPromptMessage(m)`, `setMemory(n)` |
+| `llm` | `LLMNode` | `setModel(p,n)`, `setTemperature(t)`, `addPromptMessage(m)` |
 | `code` | `CodeNode` | `setCode(lang,code)`, `addVariable(v)`, `addOutput(name,type)` |
-| `knowledge-retrieval` | `KnowledgeNode` | `addDataset(id)`, `setQuerySelector(id,f)`, `setTopK(n)` |
+| `knowledge-retrieval` | `KnowledgeNode` | `addDataset(id)`, `setQuerySelector(id,f)` |
 | `if-else` | `IfElseNode` | `addCase(c)`, `updateCondition(caseId,idx,patch)` |
 | `template-transform` | `TemplateNode` | `setTemplate(tpl)`, `addVariable(v)` |
-| `variable-aggregator` | `AggregatorNode` | `addSource(id,f)`, `removeSource(id)`, `setOutputType(t)` |
+| `variable-aggregator` | `AggregatorNode` | `addSource(id,f)`, `removeSource(id)` |
 | `iteration` | `IterationNode` | `addChild(n)`, `removeChild(id)`, `setIterator(id,f)` |
-| `tool` | `ToolNode` | `setPlugin(id,uid)`, `setToolParam(k,v)`, `setToolConfig(k,v)` |
-| `question-classifier` | `ClassifierNode` | `addClass(c)`, `setModel(p,n)`, `setInstructions(s)` |
+| `tool` | `ToolNode` | `setPlugin(id,uid)`, `setToolParam(k,v)` |
+| `question-classifier` | `ClassifierNode` | `addClass(c)`, `setModel(p,n)` |
 | `http-request` | `HTTPNode` | `setMethod(m)`, `setUrl(u)`, `setBody(type,data)` |
 | `document-extractor` | `DocNode` | `setVariableSelector(id,field)` |
 

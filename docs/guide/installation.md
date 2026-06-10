@@ -1,24 +1,41 @@
 # Dify DSL Builder — Installation & API Reference
 
-面向 AI Agent / 开发者，描述 `dify-dsl-builder` 库的安装、核心 API 和用法。
+面向 AI Agent / 开发者，描述 `dify-dsl-builder` 库的安装、CLI 用法、核心 API 和 Patch 系统。
 
 ---
 
 ## 1. 安装
+
+### 方式一：npm 全局安装（推荐用于 CLI）
+
+```bash
+npm install -g dify-dsl-builder
+dify-dsl-cli info my-workflow.yml
+```
+
+### 方式二：npx 按需使用
+
+```bash
+npx dify-dsl-cli info my-workflow.yml
+```
+
+### 方式三：克隆源码开发
 
 ```bash
 git clone <repo-url>
 cd dify-dsl-builder
 npm ci
 npm run build          # tsc → dist/
-npm run web:dev        # (可选) 启动 webpack dev server :8300
 ```
 
-CLI 命令：
+### 方式四：作为库依赖
 
 ```bash
-npm run run src/cli.ts info input/高考志愿推荐助手.yml
-npm run run src/cli.ts roundtrip input/高考志愿推荐助手.yml output/roundtrip.yml
+npm install dify-dsl-builder
+```
+
+```ts
+import { DifyDSL, CodeNode } from "dify-dsl-builder";
 ```
 
 ---

@@ -1,12 +1,19 @@
 {
   "name": "dify-dsl-builder",
   "version": "1.0.0",
-  "description": "TypeScript OOP library for manipulating Dify DSL YAML files",
+  "description": "CLI tool and TypeScript library for reading, manipulating, and writing Dify DSL YAML files",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "dify-dsl-cli": "dist/cli.js"
   },
+  "files": [
+    "dist",
+    "docs",
+    "examples",
+    "references",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "run": "tsx",
@@ -14,10 +21,20 @@
     "web:dev": "webpack serve --config webpack.config.cjs",
     "web:build": "webpack --config webpack.config.cjs --mode production"
   },
+  "keywords": [
+    "dify",
+    "dsl",
+    "yaml",
+    "workflow",
+    "cli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mack-peng/dify-dsl-builder"
+  },
+  "license": "MIT",
   "dependencies": {
-    "js-yaml": "^4.1.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
@@ -26,6 +43,8 @@
     "@types/react-dom": "^19.2.3",
     "css-loader": "^7.1.4",
     "html-webpack-plugin": "^5.6.7",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "style-loader": "^4.0.0",
     "ts-loader": "^9.6.0",
     "tsx": "^4.7.0",

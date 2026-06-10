@@ -13,6 +13,9 @@ Commands:
   info       <file>              Print node/edge stats
   flow       <file> [--short]    Print workflow topology (full IDs, --short for truncated)
   find       <file> <text>       Search text across all node content
+  diff       <yml1> <yml2>       Semantic diff between two DSL files
+  edge list  <file> [node-id]    Tabular edge listing
+  path       <file> <from> <to>  Shortest path between two nodes
   roundtrip  <input> [output]    Load YAML → save, verify round-trip
   validate   <file>              Run Ruby DSL validator
   apply      <patch> -i <in> -o <out>  Apply YAML patch file
@@ -624,10 +627,197 @@ function atomNodeSetCondition(args: string[]) {
 
 function atomNodeSetCode(args: string[]) {
   atomicNode(args, 0, (dsl) => {
-    const c = dsl.findCode(args[1]);
-    if (!c) fail(`Code node not found: ${args[1]}`);
-    (c.data as any).code = (c.data as any).code.replace(args[2], args[3]);
+    const ids = args[1].split(",");
+    for (const id of ids) {
+      const c = dsl.findCode(id.trim());
+      if (!c) fail(`Code node not found: ${id.trim()}`);
+      (c.data as any).code = (c.data as any).code.replace(args[2], args[3]);
+    }
   });
+}
+
+// ── diff ──
+
+function cmdDiff(args: string[]) {
+  const fileA = resolvePath(args[0]);
+  const fileB = resolvePath(args[1]);
+  if (!fs.existsSync(fileA)) fail(`File not found: ${fileA}`);
+  if (!fs.existsSync(fileB)) fail(`File not found: ${fileB}`);
+
+  const strA = fs.readFileSync(fileA, "utf-8");
+  const strB = fs.readFileSync(fileB, "utf-8");
+  const a = DifyDSL.parse(strA);
+  const b = DifyDSL.parse(strB);
+
+  console.log(`A: ${a.nodeCount}n ${a.edgeCount}e  B: ${b.nodeCount}n ${b.edgeCount}e\n`);
+
+  // Node diff
+  const aIds = new Set([...a.index.byId.keys()]);
+  const bIds = new Set([...b.index.byId.keys()]);
+  const added = [...bIds].filter(id => !aIds.has(id));
+  const removed = [...aIds].filter(id => !bIds.has(id));
+  const shared = [...aIds].filter(id => bIds.has(id));
+
+  if (added.length) {
+    console.log(`+ Added ${added.length} nodes:`);
+    for (const id of added) {
+      const n = b.getNode(id);
+      console.log(`  ${id} [${n?.data.type}] ${n?.title || ""}`);
+    }
+    console.log();
+  }
+  if (removed.length) {
+    console.log(`- Removed ${removed.length} nodes:`);
+    for (const id of removed) {
+      const n = a.getNode(id);
+      console.log(`  ${id} [${n?.data.type}] ${n?.title || ""}`);
+    }
+    console.log();
+  }
+
+  // Edge diff
+  const aEdgeKeys = new Set([...a.index.edges.keys()]);
+  const bEdgeKeys = new Set([...b.index.edges.keys()]);
+  const edgesAdded = [...bEdgeKeys].filter(k => !aEdgeKeys.has(k));
+  const edgesRemoved = [...aEdgeKeys].filter(k => !bEdgeKeys.has(k));
+  if (edgesAdded.length || edgesRemoved.length) {
+    console.log(`Edges: +${edgesAdded.length} -${edgesRemoved.length}`);
+  }
+
+  // Field changes in shared nodes
+  const changed: string[] = [];
+  for (const id of shared) {
+    const na = a.getNode(id)!;
+    const nb = b.getNode(id)!;
+    const da = na.data as any;
+    const db = nb.data as any;
+
+    if (na.title !== nb.title) changed.push(`  ${id} title: "${na.title}" → "${nb.title}"`);
+    if (na.desc !== nb.desc) changed.push(`  ${id} desc updated`);
+
+    if (da.type === "llm") {
+      const aTexts: string[] = (da.prompt_template || []).map((m: any) => m.text);
+      const bTexts: string[] = (db.prompt_template || []).map((m: any) => m.text);
+      for (let i = 0; i < Math.max(aTexts.length, bTexts.length); i++) {
+        if (aTexts[i] !== bTexts[i]) {
+          changed.push(`  ${id} prompt[${i}] changed (${aTexts[i]?.length || 0} → ${bTexts[i]?.length || 0} chars)`);
+        }
+      }
+    }
+    if (da.type === "code" && da.code !== db.code) {
+      const aLen = da.code?.length || 0;
+      const bLen = db.code?.length || 0;
+      changed.push(`  ${id} code changed (${aLen} → ${bLen} chars)`);
+    }
+    if (da.type === "if-else") {
+      const aVals = (da.cases || []).flatMap((c: any) => (c.conditions || []).map((cc: any) => `${cc.variable_selector?.join(".")} ${cc.comparison_operator} ${cc.value}`));
+      const bVals = (db.cases || []).flatMap((c: any) => (c.conditions || []).map((cc: any) => `${cc.variable_selector?.join(".")} ${cc.comparison_operator} ${cc.value}`));
+      if (JSON.stringify(aVals) !== JSON.stringify(bVals)) {
+        changed.push(`  ${id} conditions changed`);
+      }
+    }
+    if (da.type === "answer" && da.answer !== db.answer) {
+      changed.push(`  ${id} answer changed (${da.answer?.length || 0} → ${db.answer?.length || 0} chars)`);
+    }
+  }
+
+  // Env/conv var changes
+  if (JSON.stringify(a.envVariables) !== JSON.stringify(b.envVariables)) {
+    changed.push(`  env_variables changed (${a.envVariables.length} → ${b.envVariables.length})`);
+  }
+  if (JSON.stringify(a.convVariables) !== JSON.stringify(b.convVariables)) {
+    changed.push(`  conv_variables changed (${a.convVariables.length} → ${b.convVariables.length})`);
+  }
+
+  if (changed.length) {
+    console.log(`${changed.length} field changes:`);
+    for (const c of changed) console.log(c);
+  } else if (!added.length && !removed.length) {
+    console.log("No changes detected.");
+  }
+}
+
+// ── edge list ──
+
+function cmdEdgeList(args: string[]) {
+  const file = resolvePath(args[0]);
+  const filterId = args[1];
+  if (!fs.existsSync(file)) fail(`File not found: ${file}`);
+  const str = fs.readFileSync(file, "utf-8");
+  const dsl = DifyDSL.parse(str);
+
+  const edges = filterId ? dsl.getNodeEdges(filterId) : [...dsl.index.edges.values()];
+  if (edges.length === 0) { console.log("No edges."); return; }
+
+  console.log(`${"Source".padEnd(16)} ${"Handle".padEnd(20)} → ${"Target".padEnd(16)} Handle`);
+  console.log("-".repeat(70));
+  for (const e of edges) {
+    const src = dsl.getNode(e.source);
+    const tgt = dsl.getNode(e.target);
+    console.log(`${e.source.padEnd(16)} ${e.sourceHandle.padEnd(20)} → ${e.target.padEnd(16)} ${e.targetHandle}`);
+  }
+  console.log(`\n${edges.length} edges${filterId ? ` (filtered: ${filterId})` : ""}`);
+}
+
+// ── path ──
+
+function cmdPath(args: string[]) {
+  const file = resolvePath(args[0]);
+  const from = args[1];
+  const to = args[2];
+  if (!fs.existsSync(file)) fail(`File not found: ${file}`);
+  if (!from || !to) fail("Usage: dify-dsl-cli path <file> <from-id> <to-id>");
+
+  const str = fs.readFileSync(file, "utf-8");
+  const dsl = DifyDSL.parse(str);
+
+  // BFS
+  const visited = new Set<string>();
+  const parent = new Map<string, string>();
+  const queue = [from];
+  visited.add(from);
+
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    if (cur === to) break;
+    for (const e of dsl.index.getOutEdges(cur)) {
+      if (!visited.has(e.target)) {
+        visited.add(e.target);
+        parent.set(e.target, cur);
+        queue.push(e.target);
+      }
+    }
+  }
+
+  if (!parent.has(to) && from !== to) {
+    console.log(`No path found from ${from} to ${to}`);
+    return;
+  }
+
+  // Reconstruct path
+  const path: string[] = [to];
+  let cur = to;
+  while (cur !== from) {
+    cur = parent.get(cur)!;
+    path.unshift(cur);
+  }
+
+  console.log(`Path (${path.length - 1} hops):\n`);
+  for (let i = 0; i < path.length; i++) {
+    const n = dsl.getNode(path[i]);
+    const type = n?.data.type || "?";
+    const connector = i < path.length - 1 ? " → " : "";
+    if (i > 0) {
+      const edges = dsl.index.getOutEdges(path[i - 1]);
+      const edge = edges.find(e => e.target === path[i]);
+      if (edge && edge.sourceHandle !== "source") {
+        process.stdout.write(`  ─▶${edge.sourceHandle}▶ `);
+      } else {
+        process.stdout.write("  → ");
+      }
+    }
+    console.log(`${nodeLabel(n, false)}${connector}`);
+  }
 }
 
 // ── Main ──
@@ -661,6 +851,14 @@ async function main() {
     case "find":
       if (args.length < 2) fail("Usage: dify-dsl-cli find <file> <text>");
       cmdFind(args);
+      break;
+    case "diff":
+      if (args.length < 2) fail("Usage: dify-dsl-cli diff <yml1> <yml2>");
+      cmdDiff(args);
+      break;
+    case "path":
+      if (args.length < 3) fail("Usage: dify-dsl-cli path <file> <from-id> <to-id>");
+      cmdPath(args);
       break;
     case "apply":
       if (args.length < 1) fail("Usage: dify-dsl-cli apply <patch.yml> -i <input> -o <output>");
@@ -703,8 +901,11 @@ async function main() {
       }
       break;
     case "edge":
-      if (args.length < 1) fail("Usage: dify-dsl-cli edge <add|remove> ...");
-      if (args[0] === "add") {
+      if (args.length < 1) fail("Usage: dify-dsl-cli edge <list|add|remove> ...");
+      if (args[0] === "list") {
+        if (args.length < 2) fail("Usage: dify-dsl-cli edge list <file> [node-id]");
+        cmdEdgeList(args.slice(1));
+      } else if (args[0] === "add") {
         if (args.length < 3) fail("Usage: dify-dsl-cli edge add <file> <source> <target> [handle]");
         atomEdgeAdd(args.slice(1));
       } else if (args[0] === "remove") {

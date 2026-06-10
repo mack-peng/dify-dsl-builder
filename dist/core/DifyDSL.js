@@ -314,7 +314,32 @@ class DifyDSL {
             if (!n.data.vision)
                 errors.push({ message: `LLM ${n.id} missing 'vision' field` });
         }
+        // 8. if-else conditions must not reference env/conversation variables
+        for (const n of this.findByType("if-else")) {
+            for (const cs of n.data.cases || []) {
+                for (const c of cs.conditions || []) {
+                    const sel = c.variable_selector || [];
+                    if (sel[0] === "env" || sel[0] === "conversation") {
+                        errors.push({
+                            message: `if-else ${n.id}: condition variable_selector ["${sel.join('", "')}"] references ${sel[0]} variable — Dify does not support env/conversation in if-else conditions. Insert a Code node to bridge.`,
+                        });
+                    }
+                }
+            }
+        }
         return { errors, warnings };
+    }
+    /**
+     * Validate a condition's variable_selector before allowing modification.
+     * Returns an error message string if invalid, or null if OK.
+     */
+    static validateConditionVar(id, variableSelector) {
+        if (!variableSelector || variableSelector.length < 2)
+            return null;
+        if (variableSelector[0] === "env" || variableSelector[0] === "conversation") {
+            return `if-else ${id}: variable_selector ["${variableSelector.join('", "')}"] references ${variableSelector[0]} variable — Dify does not support env/conversation in if-else conditions. Insert a Code node before the if-else to read the variable and expose it as a node output, then reference that node in the condition.`;
+        }
+        return null;
     }
     // ─────── ⑦ toYAML ───────
     toYAML() {

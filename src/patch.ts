@@ -209,6 +209,14 @@ function applyStep(dsl: DifyDSL, raw: Record<string, any>): void {
         }
         if (obj) obj[fields[fields.length - 1]] = val.value;
       }
+      // Guard: reject env/conversation variable_selector in if-else conditions
+      if (val.field.startsWith("variable_selector") || val.field === "varType") {
+        const sel = cond.variable_selector;
+        if (sel && Array.isArray(sel)) {
+          const err = DifyDSL.validateConditionVar(val.id, sel);
+          if (err) throw new Error(err);
+        }
+      }
       break;
     }
     case "remove-classifier-class": {

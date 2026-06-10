@@ -37,6 +37,7 @@ exports.loadPatch = loadPatch;
 exports.applyPatch = applyPatch;
 const yaml = __importStar(require("js-yaml"));
 const fs = __importStar(require("fs"));
+const DifyDSL_1 = require("./core/DifyDSL");
 const code_1 = require("./nodes/code");
 // ── Step appliers ──
 function getKey(s) {
@@ -181,6 +182,15 @@ function applyStep(dsl, raw) {
                 }
                 if (obj)
                     obj[fields[fields.length - 1]] = val.value;
+            }
+            // Guard: reject env/conversation variable_selector in if-else conditions
+            if (val.field.startsWith("variable_selector") || val.field === "varType") {
+                const sel = cond.variable_selector;
+                if (sel && Array.isArray(sel)) {
+                    const err = DifyDSL_1.DifyDSL.validateConditionVar(val.id, sel);
+                    if (err)
+                        throw new Error(err);
+                }
             }
             break;
         }

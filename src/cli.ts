@@ -622,6 +622,14 @@ function atomNodeSetCondition(args: string[]) {
       for (let i = 0; i < fields.length - 1; i++) obj = obj[fields[i]];
       if (obj) obj[fields[fields.length - 1]] = value;
     }
+    // Guard: reject env/conversation variable_selector in if-else conditions
+    if (field.startsWith("variable_selector") || field === "varType") {
+      const sel = cond.variable_selector;
+      if (sel && Array.isArray(sel)) {
+        const err = DifyDSL.validateConditionVar(args[1], sel);
+        if (err) fail(err);
+      }
+    }
   });
 }
 

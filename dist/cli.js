@@ -646,6 +646,15 @@ function atomNodeSetCondition(args) {
             if (obj)
                 obj[fields[fields.length - 1]] = value;
         }
+        // Guard: reject env/conversation variable_selector in if-else conditions
+        if (field.startsWith("variable_selector") || field === "varType") {
+            const sel = cond.variable_selector;
+            if (sel && Array.isArray(sel)) {
+                const err = DifyDSL_1.DifyDSL.validateConditionVar(args[1], sel);
+                if (err)
+                    fail(err);
+            }
+        }
     });
 }
 function atomNodeSetCode(args) {

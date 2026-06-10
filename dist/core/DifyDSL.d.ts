@@ -75,5 +75,10 @@ export declare class DifyDSL {
             message: string;
         }[];
     };
+    /**
+     * Validate a condition's variable_selector before allowing modification.
+     * Returns an error message string if invalid, or null if OK.
+     */
+    static validateConditionVar(id: string, variableSelector: string[]): string | null;
     toYAML(): string;
 }

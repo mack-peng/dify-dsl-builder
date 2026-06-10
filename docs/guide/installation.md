@@ -1,135 +1,133 @@
 # Dify DSL Builder — Installation & API Reference
 
-面向 AI Agent / 开发者，描述 `@orangemust/dify-dsl-builder` 库的安装、CLI 用法、核心 API 和 Patch 系统。
+For AI agents and developers. Covers installation, CLI usage, Library API, YAML Patch system, and node types.
 
 ---
 
-## 0. AI Agent 工作流指南
+## 1. AI Agent Workflow Guide
 
-如果你是一个 AI Agent（在 Claude Code、OpenCode、Cursor、Codex 等工具中运行），请按以下流程工作。
+If you are an AI agent running in Claude Code, OpenCode, Cursor, Codex, or similar tools, follow this workflow.
 
-### 0.1 环境准备
+### 1.1 Setup
 
 ```bash
-# 在用户项目的 agent 目录中安装
 mkdir -p agent && cd agent
 npm install @orangemust/dify-dsl-builder
 ```
 
-阅读参考资料了解 DSL 结构和 Patch 编写方式：
+Read these references to understand DSL structure and patch authoring:
 
-- `node_modules/@orangemust/dify-dsl-builder/docs/guide/patch.md` — Patch 全部 17 种操作
-- `node_modules/@orangemust/dify-dsl-builder/references/dify-dsl-reference.md` — Dify DSL schema 参考
-- `node_modules/@orangemust/dify-dsl-builder/examples/patch-all-steps.yml` — 示例
+- `node_modules/@orangemust/dify-dsl-builder/docs/guide/patch.md` — all 17 patch operations
+- `node_modules/@orangemust/dify-dsl-builder/references/dify-dsl-reference.md` — Dify DSL schema
+- `node_modules/@orangemust/dify-dsl-builder/examples/patch-all-steps.yml` — example patch
 
-### 0.2 工作流
+### 1.2 Workflow
 
-用户会提供两个文件：
+The user provides two files:
 
-1. **DSL 描述文件** — 现有的 Dify 应用导出 `.yml`
-2. **需求文档** — `.md` 格式，描述需要做什么修改
+1. **DSL file** — an existing Dify app export `.yml`
+2. **Requirements document** — a `.md` file describing desired changes
 
-你的工作流程：
+Your process:
 
 ```
-① 读取 DSL .yml → dify-dsl-cli info <file> 了解结构
-② 阅读需求文档 → 逐条分析每条需求
-③ 做出技术方案 → 判断每条需求应如何处理
-④ 选择执行方式：
-   ├── 简单修改（改标题/描述/删除节点…）→ 直接用原子命令
-   └── 复杂修改（多条/涉及结构…） → 编写 YAML patch 文件
-⑤ 与用户确认方案后执行
+1. Inspect DSL  →  npx dify-dsl-cli info <file>
+2. Read requirements → analyze each item
+3. Create a technical plan → decide per-item approach
+4. Choose execution path:
+   ├── Simple change (title/desc/remove) → use atomic commands
+   └── Complex change (multi-step/structural) → write YAML patch file
+5. Confirm plan with user, then execute
 ```
 
-### 0.3 简单修改：原子命令
+### 1.3 Simple Changes: Atomic Commands
 
-适合单条、直接的操作，直接在 CLI 执行：
+Use for single, direct operations:
 
 ```bash
-# 修改节点标题
-npx dify-dsl-cli node set-title workflow.yml "node-id" "新标题"
+# Modify node title
+npx dify-dsl-cli node set-title workflow.yml "node-id" "New Title"
 
-# 修改节点描述
-npx dify-dsl-cli node set-desc workflow.yml "node-id" "新描述"
+# Modify node description
+npx dify-dsl-cli node set-desc workflow.yml "node-id" "New description"
 
-# 删除节点（自动清理关联边）
+# Remove a node (auto-cleans edges)
 npx dify-dsl-cli remove workflow.yml "node-id"
 
-# 添加边
+# Add / remove edges
 npx dify-dsl-cli edge add workflow.yml "source-id" "target-id"
-
-# 删除边
 npx dify-dsl-cli edge remove workflow.yml "source-id" "target-id"
 
-# 替换 LLM prompt 中的文本
-npx dify-dsl-cli node set-prompt workflow.yml "llm-id" "system" "旧文本" "新文本"
+# Replace text in LLM prompt
+npx dify-dsl-cli node set-prompt workflow.yml "llm-id" "system" "old" "new"
 ```
 
-### 0.4 复杂修改：YAML Patch 文件
+### 1.4 Complex Changes: YAML Patch Files
 
-当需求涉及多条修改、结构调整或批量操作时，编写 patch 文件：
+When changes span multiple nodes or involve structural edits, write a patch file:
 
 ```yaml
-description: "补丁描述 — 说明做了什么"
+description: "Brief description of changes"
 steps:
-  - set-title: { id: "node-1", value: "新标题" }
-  - set-prompt: { id: "llm-1", role: "system", replace: "旧", with: "新" }
+  - set-title: { id: "node-1", value: "New Title" }
+  - set-prompt: { id: "llm-1", role: "system", replace: "old", with: "new" }
   - remove-node: { id: "node-old" }
   - add-code-node:
       id: "new-code"
-      title: "新增节点"
+      title: "New Node"
       code: "def main(): return {}"
   - add-edge: { source: "new-code", target: "answer-node" }
   - env-set: { name: "API_KEY", value: "xxx", type: "string" }
   - conv-set: { name: "user_profile", value_type: "string" }
 ```
 
-全部 17 种操作参见 `patch.md`。编写完成后：
+Full operation reference: `docs/guide/patch.md` (17 operations).
 
-1. 将 patch 内容展示给用户确认
-2. 用户确认后执行：
+After writing:
+1. Show the patch to the user for confirmation
+2. Execute:
 
 ```bash
 npx dify-dsl-cli apply patch.yml -i input.yml -o output.yml
 ```
 
-apply 命令会自动执行 `validate()` 校验，不通过则退出并报告错误。
+The `apply` command runs `validate()` automatically. Non-zero exit on errors.
 
-### 0.5 执行规范
+### 1.5 Execution Rules
 
-- **先看后改**：必须先用 `dify-dsl-cli info` 了解现有 DSL 结构，再决定如何修改
-- **原子命令不改原文件位置**：原地修改 .yml 后，建议先让用户导入 Dify 验证
-- **patch 输出到新文件**：用 `-o output.yml` 新文件，保留原始文件不污染
-- **patch 只包含修改**：不要尝试用 patch 重新生成整个 DSL，patch 仅描述增量修改
-- **不确定的先问**：对 DSL 结构或 patch 操作参数有疑问时，先查 `dify-dsl-reference.md` 或问用户
+- **Inspect first**: always run `dify-dsl-cli info` before modifying
+- **Atomic commands modify in-place**: suggest user import the result into Dify to verify
+- **Patch outputs to new file**: use `-o` to preserve the original
+- **Patches are incremental**: describe only modifications, never regenerate the entire DSL
+- **When unsure, ask**: consult `dify-dsl-reference.md` or the user before guessing
 
 ---
 
-## 1. 安装
+## 2. Installation
 
-### 方式一：npm 全局安装（推荐用于 CLI）
+### Option A: Global install (recommended for CLI)
 
 ```bash
 npm install -g @orangemust/dify-dsl-builder
 dify-dsl-cli info my-workflow.yml
 ```
 
-### 方式二：npx 按需使用
+### Option B: npx (no install)
 
 ```bash
 npx dify-dsl-cli info my-workflow.yml
 ```
 
-### 方式三：克隆源码开发
+### Option C: Clone for development
 
 ```bash
-git clone <repo-url>
+git clone git@github.com:mack-peng/dify-dsl-builder.git
 cd dify-dsl-builder
 npm ci
 npm run build          # tsc → dist/
 ```
 
-### 方式四：作为库依赖
+### Option D: Library dependency
 
 ```bash
 npm install @orangemust/dify-dsl-builder
@@ -141,117 +139,110 @@ import { DifyDSL, CodeNode } from "@orangemust/dify-dsl-builder";
 
 ---
 
-## 2. 核心类：`DifyDSL`
+## 3. CLI Commands
 
-路径：`src/core/DifyDSL.ts`  
-导出：`import { DifyDSL } from "@orangemust/dify-dsl-builder";`
-
-### 2.1 解析
-
-```ts
-import * as fs from "fs";
-import { DifyDSL } from "dify-dsl-builder";
-
-const yamlStr = fs.readFileSync("input/app.yml", "utf-8");
-const dsl = DifyDSL.parse(yamlStr);
 ```
+dify-dsl-cli <command> [options]
 
-内部自动执行 7 步管线：
+Commands:
+  info       <file>              Print node/edge stats
+  roundtrip  <input> [output]    Parse → save, verify round-trip
+  validate   <file>              Run Ruby DSL validator
+  apply      <patch> -i <in> -o <out>  Apply YAML patch file
+  remove     <file> <id>         Remove a node
 
-| 步骤 | 方法 | 产出 |
-|------|------|------|
-| ① | `js-yaml.load()` | raw JSON |
-| ② | `NodeIndex.rebuild()` | typed `NodeIndex` |
-| ③ | edges → adjacency maps | O(1) 连通性查询 |
-| ④ | CRUD methods | get/add/remove/update |
-| ⑤ | Node instance methods | 节点细节修改 |
-| ⑥ | `toJSON()` | Dify DSL JSON plain object |
-| ⑦ | `yaml.dump(toJSON())` | YAML 字符串 |
-
-### 2.2 CRUD — 增删改查
-
-```ts
-// 查 (全部 O(1))
-const node = dsl.getNode("1747000000001");
-const allLLMs = dsl.findByType("llm");
-const start = dsl.findStart("1747000000001");
-
-// 上下游
-const prev = dsl.getPrevIds("1747000006001");  // → ["1780889576194"]
-const next = dsl.getNextIds("1747000006001");  // → ["1782000000003", "1787000000001"]
-
-// 增
-import { CodeNode } from "dify-dsl-builder";
-dsl.addNode(new CodeNode("new-node", { title: "My Code", code: "print(1)" }));
-dsl.addEdge("source-id", "target-id");
-
-// 删（自动清理相关边）
-dsl.removeNode("old-node-id");
-dsl.removeEdge("edge-id");
-
-// 改
-dsl.updateNode("node-id", (node) => {
-  node.setTitle("新标题");
-  node.setDesc("新描述");
-});
-```
-
-### 2.3 序列化
-
-```ts
-const json = dsl.toJSON();
-// {
-//   version: "0.5.0",
-//   kind: "app",
-//   app: { name: "...", mode: "advanced-chat", ... },
-//   workflow: { graph: { nodes: [...], edges: [...] }, ... }
-// }
-
-const yaml = dsl.toYAML();
-// yaml.dump(json, { lineWidth: -1, noRefs: true, quotingType: "'" })
-```
-
-### 2.4 验证
-
-```ts
-const report = dsl.validate();
-// { errors: [{ message: "..." }], warnings: [{ message: "..." }] }
-```
-
-检查项：Start 节点存在、Answer 节点存在（advanced-chat 模式）、边引用有效节点、Code 输出类型合法。
-
-### 2.5 文件快捷操作
-
-```ts
-dsl.save("output.yml");  // toYAML() + writeFileSync
+Atomic commands (modify file in place):
+  node set-title   <file> <id> <title>
+  node set-desc    <file> <id> <desc>
+  node set-prompt  <file> <id> <role> <replace> <with>
+  edge add         <file> <src> <tgt> [handle]
+  edge remove      <file> <src> <tgt> [handle]
 ```
 
 ---
 
-## 3. 属性 / 方法速查
+## 4. Library API
 
-### 3.1 `DifyDSL`
+### 4.1 Core Class: `DifyDSL`
 
-| 属性/方法 | 类型 | 说明 |
-|-----------|------|------|
-| `dsl.version` | `string` | DSL 版本号 |
-| `dsl.app` | `AppMeta` | 应用元信息 (name/mode/description/icon) |
-| `dsl.dependencies` | `Dependency[]` | 插件依赖 |
-| `dsl.features` | `Record<string, unknown>` | 功能配置 |
-| `dsl.viewport` | `{x, y, zoom}` | 画布视口 |
-| `dsl.envVariables` | `unknown[]` | 环境变量 |
-| `dsl.convVariables` | `unknown[]` | 对话变量 (advanced-chat) |
-| `dsl.index` | `NodeIndex` | 底层索引 (byId/byType/edges) |
-| `dsl.nodeCount` | `number` | 节点总数 |
-| `dsl.edgeCount` | `number` | 边总数 |
+```ts
+import * as fs from "fs";
+import { DifyDSL } from "@orangemust/dify-dsl-builder";
+
+const yamlStr = fs.readFileSync("app.yml", "utf-8");
+const dsl = DifyDSL.parse(yamlStr);
+```
+
+Internal 7-step pipeline:
+
+| Step | Method | Output |
+|------|--------|--------|
+| 1 | `js-yaml.load()` | raw JSON |
+| 2 | `NodeIndex.rebuild()` | typed NodeIndex |
+| 3 | edges → adjacency maps | O(1) connectivity |
+| 4 | CRUD methods | get/add/remove/update |
+| 5 | Node instance methods | per-node modifications |
+| 6 | `toJSON()` | plain JSON object |
+| 7 | `yaml.dump(toJSON())` | YAML string |
+
+### 4.2 CRUD
+
+```ts
+// Query (all O(1))
+const node = dsl.getNode("node-id");
+const allLLMs = dsl.findByType("llm");
+const prevIds = dsl.getPrevIds("node-id");
+const nextIds = dsl.getNextIds("node-id");
+
+// Add
+import { CodeNode } from "@orangemust/dify-dsl-builder";
+dsl.addNode(new CodeNode("new-id", { title: "My Code", code: "print(1)" }));
+dsl.addEdge("source-id", "target-id");
+
+// Remove (auto-cleans related edges)
+dsl.removeNode("old-node-id");
+dsl.removeEdge("edge-id");
+
+// Update (get → mutate → synced via index)
+dsl.updateNode("node-id", (node) => {
+  node.setTitle("New Title");
+  node.setDesc("New Description");
+});
+```
+
+### 4.3 Serialization & Validation
+
+```ts
+const json = dsl.toJSON();    // plain object
+const yaml = dsl.toYAML();    // yaml.dump string
+dsl.save("output.yml");       // toYAML() + writeFileSync
+
+const report = dsl.validate();
+// { errors: [{ message: "..." }], warnings: [{ message: "..." }] }
+```
+
+Validation checks: Start node exists, Answer node exists (advanced-chat), edge node refs, code output types, env/conv variable schema completeness (`id` + `selector` + value-type match), LLM `context`/`vision` required fields.
+
+### 4.4 Properties Reference
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `dsl.version` | `string` | DSL version |
+| `dsl.app` | `AppMeta` | App metadata (name/mode/description/icon) |
 | `dsl.mode` | `string` | `workflow` \| `advanced-chat` |
+| `dsl.nodeCount` | `number` | Total node count |
+| `dsl.edgeCount` | `number` | Total edge count |
+| `dsl.dependencies` | `Dependency[]` | Plugin dependencies |
+| `dsl.envVariables` | `unknown[]` | Environment variables |
+| `dsl.convVariables` | `unknown[]` | Conversation variables (advanced-chat) |
+| `dsl.features` | `Record<string, unknown>` | Feature config |
+| `dsl.viewport` | `{x, y, zoom}` | Canvas viewport |
+| `dsl.index` | `NodeIndex` | Underlying index (byId/byType/edges) |
 
-### 3.2 `NodeIndex`
+### 4.5 NodeIndex
 
-| 方法 | 返回 | 复杂度 |
-|------|------|--------|
-| `index.byId.get(id)` | `Node \| undefined` | O(1) |
-| `index.byType.get(type)` | `Set<string> \| undefined` | O(1) |
+| Method | Returns | Complexity |
+|--------|---------|------------|
 | `index.getNode(id)` | `Node \| undefined` | O(1) |
 | `index.getNodesByType(type)` | `Node[]` | O(1) + O(n) |
 | `index.getOutEdges(id)` | `EdgeData[]` | O(1) per edge |
@@ -259,22 +250,24 @@ dsl.save("output.yml");  // toYAML() + writeFileSync
 | `index.getPrevIds(id)` | `string[]` | O(1) |
 | `index.getNextIds(id)` | `string[]` | O(1) |
 
-### 3.3 `BaseNode` — 所有节点基类
+### 4.6 BaseNode
+
+All node types extend `BaseNode<T>`:
 
 ```ts
-abstract class BaseNode<T extends NodeData> {
+abstract class BaseNode<T extends BaseNodeData> {
   id: string;
-  type: string;          // 外层类型 "custom" | "custom-iteration-start"
-  title: string;         // getter + setter
-  desc: string;          // getter + setter
-  position: { x, y };
+  type: string;          // "custom" | "custom-iteration-start"
+  title: string;
+  desc: string;
+  position: { x: number; y: number };
   width: number;
   height: number;
   zIndex?: number;
-  parentId?: string;     // iteration 子节点
+  parentId?: string;     // for iteration children
   isInIteration?: boolean;
   iterationId?: string;
-  data: T;               // 类型化数据
+  data: T;               // typed data block
 
   setTitle(v): this;
   setDesc(v): this;
@@ -282,115 +275,112 @@ abstract class BaseNode<T extends NodeData> {
   setSize(w, h): this;
   setZIndex(z): this;
 
-  toJSON(): Record<string, unknown>;   // 子类实现
-  outerJSON(dataBlock): Record<string, unknown>;   // 生成外层壳
-  dataJSON(extra?): Record<string, unknown>;        // 生成 data 块
+  toJSON(): Record<string, unknown>;   // subclass implements
+  outerJSON(dataBlock): Record<string, unknown>;
+  dataJSON(extra?): Record<string, unknown>;
 }
 ```
 
 ---
 
-## 4. 节点创建
+## 5. Node Types
 
-所有节点构造器都用同一模式：`new XxxNode(id, data?)`，其中 `data` 是类型化的 Partial 数据对象。构造后通过 `dsl.addNode(node)` 添加到 DSL。
+All nodes follow the pattern: `new XxxNode(id, data?)`. After construction, use `dsl.addNode(node)`.
 
 ```ts
 import {
   StartNode, AnswerNode, LLMNode, CodeNode,
   KnowledgeNode, IfElseNode, TemplateNode, AggregatorNode,
   IterationNode, IterationStartNode, ToolNode, ClassifierNode,
-} from "dify-dsl-builder";
+  HTTPNode, DocNode,
+} from "@orangemust/dify-dsl-builder";
 ```
 
-### 4.1 `StartNode`
+### 5.1 StartNode
 
 ```ts
 new StartNode("id-001", {
-  title: "开始",
-  desc: "收集用户信息",
+  title: "Start",
+  desc: "Collect user info",
   variables: [
     {
-      variable: "user_name",            // 变量名，在 prompt 中用 {{#node_id.user_name#}} 引用
-      label: "姓名",
-      type: "text-input",               // text-input | paragraph | select | number | url | files | file | file-list | json | json_object | checkbox
+      variable: "user_name",            // referenced as {{#node_id.user_name#}}
+      label: "Name",
+      type: "text-input",               // text-input | paragraph | select | number | url | files | json | ...
       required: true,
-      max_length: 100,                  // 可选
-      options: [],                      // select 类型时填选项列表
-      placeholder: "请输入姓名",         // 可选
-      default: "",                      // 可选
+      max_length: 100,
+      options: [],
+      placeholder: "Enter your name",
     },
   ],
 });
 ```
 
-### 4.2 `AnswerNode`
+### 5.2 AnswerNode
 
 ```ts
 new AnswerNode("id-002", {
-  title: "回答",
-  desc: "输出推荐报告",
-  answer: "{{#llm-node.text#}}",        // Jinja2 模板
-  variables: [                          // 必须匹配 answer 中所有引用
+  title: "Answer",
+  desc: "Output recommendation report",
+  answer: "{{#llm-node.text#}}",       // Jinja2 template
+  variables: [
     { variable: "llm-node.text", value_selector: ["llm-node", "text"], value_type: "string" },
   ],
 });
 ```
 
-### 4.3 `LLMNode`
+### 5.3 LLMNode
 
 ```ts
 new LLMNode("id-003", {
-  title: "智能分析",
-  desc: "生成推荐",
+  title: "Analysis",
+  desc: "Generate recommendations",
   model: {
     provider: "langgenius/deepseek/deepseek",
-    name: "deepseek-chat",              // 模型名
-    mode: "chat",                       // chat | completion
+    name: "deepseek-chat",
+    mode: "chat",                      // chat | completion
     completion_params: { temperature: 0.3 },
   },
   prompt_template: [
-    { role: "system", text: "你是一位高考志愿专家。", id: "prompt-01" },
-    { role: "user", text: "请根据信息推荐。", id: "prompt-02" },
+    { role: "system", text: "You are a college advisor.", id: "prompt-01" },
+    { role: "user", text: "Recommend based on this info.", id: "prompt-02" },
   ],
   context: { enabled: false, variable_selector: [] },
   vision: { enabled: false },
-  memory: {                             // advanced-chat 模式可选
+  memory: {                            // advanced-chat only
     window: { enabled: true, size: 10 },
     query_prompt_template: "{{#sys.query#}}",
-  },
-  prompt_config: {                      // 可选
-    jinja2_variables: [],
   },
 });
 ```
 
-### 4.4 `CodeNode`
+### 5.4 CodeNode
 
 ```ts
 new CodeNode("id-004", {
-  title: "处理数据",
-  desc: "格式化结果",
-  code_language: "python3",             // python3 | javascript
+  title: "Process Data",
+  desc: "Format results",
+  code_language: "python3",            // python3 | javascript
   code: `def main(input: str) -> dict:\n    return {"result": input.upper()}`,
   variables: [
     { variable: "input", value_selector: ["upstream-id", "text"], value_type: "string" },
   ],
-  outputs: {                             // 每个输出的类型声明
+  outputs: {
     result: { type: "string", children: null },
   },
 });
 ```
 
-### 4.5 `KnowledgeNode`
+### 5.5 KnowledgeNode
 
 ```ts
 new KnowledgeNode("id-005", {
-  title: "知识库搜索",
-  desc: "用分数范围搜索大学专业",
-  dataset_ids: ["uuid-of-dataset"],    // 知识库 UUID 数组
+  title: "Knowledge Search",
+  desc: "Search university programs by score range",
+  dataset_ids: ["uuid-of-dataset"],
   query_variable_selector: ["upstream-id", "search_query"],
-  retrieval_mode: "multiple",           // single | multiple
-  multiple_retrieval_config: {          // multiple 模式必填
+  retrieval_mode: "multiple",          // single | multiple
+  multiple_retrieval_config: {
     top_k: 8,
     score_threshold: 0.5,
     reranking_enable: false,
@@ -398,12 +388,12 @@ new KnowledgeNode("id-005", {
 });
 ```
 
-### 4.6 `IfElseNode`
+### 5.6 IfElseNode
 
 ```ts
 new IfElseNode("id-006", {
-  title: "分数分流",
-  desc: ">=450走本科",
+  title: "Score Split",
+  desc: ">= 450 routes to undergraduate track",
   cases: [
     {
       case_id: "true",
@@ -413,7 +403,7 @@ new IfElseNode("id-006", {
         {
           id: "cond-1",
           variable_selector: ["start-id", "score"],
-          comparison_operator: "≥",     // contains | not contains | start with | end with | is | is not | empty | not empty | = | != | > | < | >= | <= | in | not in | null | not null
+          comparison_operator: "≥",
           value: "450",
           varType: "number",
         },
@@ -423,316 +413,164 @@ new IfElseNode("id-006", {
 });
 ```
 
-### 4.7 `TemplateNode`
+### 5.7 TemplateNode
 
 ```ts
 new TemplateNode("id-007", {
-  title: "构建查询",
-  desc: "用当前 item 构建搜索词",
-  template: "{{ item }}",              // Jinja2 模板
+  title: "Build Query",
+  desc: "Construct search query from current item",
+  template: "{{ item }}",
   variables: [
     { variable: "item", value_selector: ["iteration-id", "item"], value_type: "string" },
   ],
 });
 ```
 
-### 4.8 `AggregatorNode`
+### 5.8 AggregatorNode
 
 ```ts
 new AggregatorNode("id-008", {
-  title: "合并结果",
-  desc: "合并多路 KB 搜索结果",
-  output_type: "array",                // 必须匹配所有 source 的输出类型
-  variables: [                         // 注意：是裸嵌套数组，非对象列表
+  title: "Merge Results",
+  desc: "Merge KB search results from multiple branches",
+  output_type: "array",
+  variables: [                         // Bare nested arrays, NOT objects
     ["node-1", "result"],
     ["node-2", "result"],
   ],
 });
 ```
 
-### 4.9 `IterationNode`
+### 5.9 IterationNode
 
 ```ts
-// 外层迭代容器
 const iter = new IterationNode("iter-001", {
-  title: "迭代专业搜索",
-  desc: "逐专业搜索知识库",
+  title: "Iterate Specializations",
+  desc: "Search knowledge base per specialization",
   iterator_selector: ["code-node", "majors"],
   iterator_input_type: "array[string]",
   output_selector: ["kb-node", "result"],
   output_type: "array[object]",
-  start_node_id: "iter-001-start",      // 必须和内部 iteration-start 节点 ID 一致
+  start_node_id: "iter-001-start",     // Must match iteration-start node ID
   is_parallel: true,
   parallel_nums: 3,
   error_handle_mode: "terminated",
-  width: 650,
-  height: 250,
+  width: 650, height: 250,
 });
 
-// 内部 iteration-start 节点
-const iterStart = new IterationStartNode("iter-001", {
-  title: "",
-  desc: "",
-});
-
-// 内部子节点（通过 addChild 添加，自动设置 parentId/isInIteration/iterationId）
-import { TemplateNode, KnowledgeNode, CodeNode } from "dify-dsl-builder";
-const tpl = new TemplateNode("inner-tpl", { template: "{{ item }}", ... });
-const kb = new KnowledgeNode("inner-kb", { dataset_ids: [...], ... });
-
-iter.addChild(tpl);
-iter.addChild(kb);
+const iterStart = new IterationStartNode("iter-001", { title: "", desc: "" });
 iter.startNode = iterStart;
 
-// 添加到 DSL
-dsl.addNode(iter);   // 自动将子节点加入索引
+const child = new TemplateNode("inner-tpl", { template: "{{ item }}", ... });
+iter.addChild(child);                  // Auto-sets parentId/isInIteration/iterationId
+
+dsl.addNode(iter);                     // Children added to index automatically
 ```
 
-### 4.10 `ToolNode`
+### 5.10 ToolNode
 
 ```ts
 new ToolNode("id-009", {
-  title: "网络搜索",
-  desc: "百度智能搜索",
+  title: "Web Search",
+  desc: "Baidu AI search",
   tool_name: "smart_search",
-  tool_label: "智能搜索生成",
-  tool_description: "提供AI增强的智能语义搜索工具",
+  tool_label: "Smart Search",
   plugin_id: "qianfan/baidu_ai_search",
-  plugin_unique_identifier: "qianfan/baidu_ai_search:0.0.1@97821ba294ff49a4d7fabb6746bfd7993373e27c2a110efd684865bf21f2ff6e",
+  plugin_unique_identifier: "qianfan/baidu_ai_search:0.0.1@...",
   provider_id: "qianfan/baidu_ai_search/baidu_ai_search",
-  provider_name: "qianfan/baidu_ai_search/baidu_ai_search",
   provider_type: "builtin",
-  provider_icon: "/console/api/workspaces/current/plugin/icon?...",
   is_team_authorization: true,
   tool_node_version: "2",
-  paramSchemas: [
-    {
-      name: "query",
-      type: "string",
-      form: "llm",
-      required: true,
-      label: { zh_Hans: "搜索查询", en_US: "Search query" },
-      human_description: { zh_Hans: "搜索查询关键词或短语", en_US: "Search query keywords or phrases." },
-      llm_description: "",
-      auto_generate: null, default: null, max: null, min: null,
-      options: [], placeholder: null, precision: null, scope: null, template: null,
-    },
-  ],
+  paramSchemas: [{
+    name: "query", type: "string", form: "llm", required: true,
+    label: { en_US: "Search query" },
+    human_description: { en_US: "Search query keywords or phrases." },
+    auto_generate: null, default: null, max: null, min: null,
+    options: [], placeholder: null, precision: null, scope: null, template: null,
+  }],
   params: { query: "", model: "", temperature: "", top_p: "", resource_type_filter: "" },
   tool_parameters: {
-    query: { type: "mixed", value: "{{#upstream-id.search_query#}}" },
-    model: { type: "mixed", value: "" },
+    query: { type: "mixed", value: "{{#upstream-id.query#}}" },
     temperature: { type: "constant", value: 0.8 },
-    top_p: { type: "constant", value: 0.8 },
-    resource_type_filter: { type: "constant", value: '[{"type":"web","top_k":10}]' },
   },
   tool_configurations: {},
 });
 ```
 
-### 4.11 `ClassifierNode`
+### 5.11 ClassifierNode
 
 ```ts
 new ClassifierNode("id-010", {
-  title: "意图分类",
-  desc: "路由到专科处理路线",
+  title: "Intent Classification",
+  desc: "Route based on user intent",
   query_variable_selector: ["sys", "query"],
   model: { provider: "langgenius/deepseek/deepseek", name: "deepseek-chat", mode: "chat", completion_params: { temperature: 0 } },
   classes: [
-    { id: "school_recommend", name: "学校推荐", description: "要求推荐学校或专业" },
-    { id: "career_prospect", name: "就业前景", description: "询问就业率" },
+    { id: "school_recommend", name: "School Recommendation", description: "User wants school or major recommendations" },
+    { id: "career_prospect", name: "Career Prospects", description: "User asks about employment rates" },
   ],
-  instructions: "",                     // 可选
+  instructions: "",
 });
 ```
 
-### 4.12 `IterationStartNode`（迭代内部起点）
-
-```ts
-new IterationStartNode("parent-iteration-id", {
-  title: "",
-  desc: "",
-});
-```
-
-注意：`IterationStartNode` 的 ID 自动由父迭代 ID + `-start` 拼接而成。构造后手动设为 `iter.startNode = iterStart`。
-
-### 4.13 `HTTPNode`
+### 5.12 HTTPNode
 
 ```ts
 new HTTPNode("id-http", {
-  title: "HTTP 请求",
-  desc: "调用外部 API",
-  method: "GET",                        // GET | POST | PUT | DELETE | PATCH | HEAD
+  title: "HTTP Request",
+  desc: "Call external API",
+  method: "GET",                       // GET | POST | PUT | DELETE | PATCH | HEAD
   url: "https://api.example.com/data",
-  authorization: { type: "no-auth" },   // no-auth | api-key | custom
+  authorization: { type: "no-auth" },  // no-auth | api-key | custom
   headers: "",
   params: "",
-  body: { type: "none", data: "" },     // none | form-data | x-www-form-urlencoded | raw-text | json
+  body: { type: "none", data: "" },    // none | form-data | x-www-form-urlencoded | raw-text | json
   timeout: { connect: 10, read: 30, write: 30 },
 });
 ```
 
-### 4.14 `DocNode`（文档提取器）
+### 5.13 DocNode
 
 ```ts
 new DocNode("id-doc", {
-  title: "提取文档",
-  desc: "从上游节点提取文档内容",
+  title: "Extract Document",
+  desc: "Extract document content from upstream node",
   variable_selector: ["upstream-id", "result"],
-  is_array_file: false,                 // 可选
+  is_array_file: false,
 });
 ```
 
 ---
 
-## 5. 各 Node 子类的方法
+## 6. Node Methods (per-Type)
 
-### 5.1 `StartNode`
-
-```ts
-.addVariable({ variable, label, type, required, options, placeholder })
-.removeVariable(name)
-.updateVariable(name, patch)
-.variables   // getter → StartVariable[]
-```
-
-### 5.2 `AnswerNode`
-
-```ts
-.setAnswer(template)
-.addVariableRef(nodeId, field, valueType?)
-.removeVariableRef(nodeId)
-.answer          // getter
-.answerVariables // getter
-```
-
-### 5.3 `LLMNode`
-
-```ts
-.setModel(provider, name)
-.setTemperature(n)
-.setContextEnabled(bool)
-.setContextSelector(nodeId, field)
-.addPromptMessage({ role, text, id? })
-.setMemory(windowSize)
-.clearMemory()
-.promptMessages  // getter
-.modelConfig     // getter
-.hasMemory       // boolean
-```
-
-### 5.4 `CodeNode`
-
-```ts
-.setCode(lang, code)
-.addVariable(v)
-.removeVariable(name)
-.addOutput(name, type)
-.removeOutput(name)
-.code          // getter
-.codeLanguage  // getter
-.inputVariables // getter
-.outputDefs    // getter
-```
-
-### 5.5 `KnowledgeNode`
-
-```ts
-.addDataset(id)
-.removeDataset(id)
-.setQuerySelector(nodeId, field)
-.setTopK(n)
-```
-
-### 5.6 `IfElseNode`
-
-```ts
-.addCase(c)
-.removeCase(id)
-.updateCondition(caseId, condIdx, patch)
-.cases  // getter
-```
-
-### 5.7 `TemplateNode`
-
-```ts
-.setTemplate(tpl)
-.addVariable(v)
-.removeVariable(name)
-.template  // getter
-```
-
-### 5.8 `AggregatorNode`
-
-```ts
-.addSource(nodeId, field)
-.removeSource(nodeId)
-.setOutputType(t)
-.sources  // getter
-```
-
-### 5.9 `IterationNode`
-
-```ts
-.addChild(node)
-.removeChild(id)
-.findChild(id)
-.setIterator(nodeId, field)
-.setOutputSelector(nodeId, field)
-.children  // IterChildNode[]
-.startNode // IterationStartNode | null
-```
-
-### 5.10 `ToolNode`
-
-```ts
-.setPlugin(pluginId, uniqueId)
-.setToolParam(name, { type, value })
-.setToolConfig(key, value)
-```
-
-### 5.11 `ClassifierNode`
-
-```ts
-.addClass({ id, name, description })
-.removeClass(id)
-.setModel(provider, name)
-.setInstructions(s)
-```
-
-### 5.12 `HTTPNode`
-
-```ts
-.setMethod(method)        // "GET" | "POST" | "PUT" | "DELETE"
-.setUrl(url)
-.setBody(type, data)
-```
-
-### 5.13 `DocNode`
-
-```ts
-.setVariableSelector(nodeId, field)
-```
+| Node | Methods |
+|------|---------|
+| `StartNode` | `addVariable(v)`, `removeVariable(n)`, `updateVariable(n, patch)` |
+| `AnswerNode` | `setAnswer(tpl)`, `addVariableRef(id, f)`, `removeVariableRef(id)` |
+| `LLMNode` | `setModel(p, n)`, `setTemperature(t)`, `setContextEnabled(b)`, `addPromptMessage(m)`, `setMemory(s)`, `clearMemory()` |
+| `CodeNode` | `setCode(lang, code)`, `addVariable(v)`, `removeVariable(n)`, `addOutput(name, type)`, `removeOutput(n)` |
+| `KnowledgeNode` | `addDataset(id)`, `removeDataset(id)`, `setQuerySelector(id, f)`, `setTopK(n)` |
+| `IfElseNode` | `addCase(c)`, `removeCase(id)`, `updateCondition(caseId, idx, patch)` |
+| `TemplateNode` | `setTemplate(tpl)`, `addVariable(v)`, `removeVariable(n)` |
+| `AggregatorNode` | `addSource(id, f)`, `removeSource(id)`, `setOutputType(t)` |
+| `IterationNode` | `addChild(n)`, `removeChild(id)`, `findChild(id)`, `setIterator(id, f)`, `setOutputSelector(id, f)` |
+| `ToolNode` | `setPlugin(id, uid)`, `setToolParam(n, v)`, `setToolConfig(k, v)` |
+| `ClassifierNode` | `addClass(c)`, `removeClass(id)`, `setModel(p, n)`, `setInstructions(s)` |
+| `HTTPNode` | `setMethod(m)`, `setUrl(u)`, `setBody(type, data)` |
+| `DocNode` | `setVariableSelector(id, f)` |
 
 ---
 
-## 6. 类型定义
-
-### `NodeData` — 所有节点 data 块基类
+## 7. Type Definitions
 
 ```ts
-interface NodeData {
+interface BaseNodeData {
   type: string;
   title: string;
   desc: string;
   selected: boolean;
 }
-```
 
-### `EdgeData`
-
-```ts
 interface EdgeData {
   id: string;
   source: string;
@@ -749,23 +587,7 @@ interface EdgeData {
     iteration_id?: string;
   };
 }
-```
 
-### `DifyDSLJSON`
-
-```ts
-interface DifyDSLJSON {
-  version: string;
-  kind: "app";
-  app: AppMeta;
-  dependencies: Dependency[];
-  workflow: WorkflowData;
-}
-```
-
-### `AppMeta`
-
-```ts
 interface AppMeta {
   name: string;
   mode: "workflow" | "advanced-chat";
@@ -778,157 +600,102 @@ interface AppMeta {
 
 ---
 
-## 7. 典型使用模式
+## 8. Usage Patterns
 
-### 7.1 加载并检查
+### Load & Inspect
 
 ```ts
 const dsl = DifyDSL.parse(fs.readFileSync("app.yml", "utf-8"));
 console.log(dsl.nodeCount, "nodes,", dsl.edgeCount, "edges");
-console.log(dsl.findByType("llm").length, "LLM nodes");
-console.log(dsl.findByType("tool").length, "tool nodes");
-
-// 检查连通性
-const id = "1747000006001";
-console.log("上游:", dsl.getPrevIds(id));
-console.log("下游:", dsl.getNextIds(id));
+for (const n of dsl.findByType("llm")) {
+  console.log(n.id, n.title);
+}
 ```
 
-### 7.2 修改节点后输出
+### Modify & Save
 
 ```ts
 const dsl = DifyDSL.parse(yamlStr);
 
-dsl.updateNode("1747000006001", (node) => {
-  node.setTitle("修改后的 LLM");
+dsl.updateNode("llm-001", (node) => {
+  node.setTitle("Updated LLM");
   node.setModel("openai", "gpt-4o");
   node.setTemperature(0.5);
 });
 
-const outYaml = dsl.toYAML();
-fs.writeFileSync("output.yml", outYaml);
+fs.writeFileSync("output.yml", dsl.toYAML());
 ```
 
-### 7.3 删除节点并重新接线
+### Remove & Rewire
 
 ```ts
-const toRemove = "1782000000002";
-
-// 记录上下游关系（如有需要）
+const toRemove = "old-node-id";
 const next = dsl.getNextIds(toRemove);
 
-dsl.removeNode(toRemove);  // 自动清理边
-
-// 重新接线：将原下游接到原上游
-dsl.addEdge("1747000003001", next[0]);
+dsl.removeNode(toRemove);              // Auto-cleans edges
+dsl.addEdge("upstream-id", next[0]);   // Rewire: upstream → former downstream
 ```
 
-### 7.4 添加一个 Code 节点
+### Add a Code Node
 
 ```ts
-import { CodeNode } from "dify-dsl-builder";
-
-const code = new CodeNode("my-new-code", {
-  title: "处理数据",
+const code = new CodeNode("new-code", {
+  title: "Transform Data",
   code: `def main(input: str) -> dict:\n    return {"result": input.upper()}`,
   code_language: "python3",
-  variables: [{ variable: "input", value_selector: ["upstream-id", "output"] }],
+  variables: [{ variable: "input", value_selector: ["upstream", "text"] }],
 });
 code.addOutput("result", "string");
 code.setPosition(1000, 500);
 
 dsl.addNode(code);
-dsl.addEdge("upstream-id", "my-new-code");
-dsl.addEdge("my-new-code", "next-node-id", "source");
+dsl.addEdge("upstream", "new-code");
+dsl.addEdge("new-code", "downstream");
 ```
 
 ---
 
-## 8. YAML Patch 系统（实现需求的首选方式）
+## 9. YAML Patch System
 
-使用 YAML patch 文件声明式地修改 DSL，无需写 TypeScript 代码。**实现用户需求时，优先编写 patch 描述文件。**
+Declaratively modify DSL via YAML patch files. See the full guide at `docs/guide/patch.md` (17 operations) and examples at `examples/patch-all-steps.yml`.
 
-完整编写指南：`docs/guide/patch.md`  
-完整示例：`examples/patch-all-steps.yml`
-
-### 8.1 CLI 应用
+### CLI
 
 ```bash
-npx tsx src/cli.ts apply <patch.yml> -i <input.yml> -o <output.yml>
+npx dify-dsl-cli apply patch.yml -i input.yml -o output.yml
 ```
 
-apply 完成后自动调用 `dsl.validate()`，校验不通过则 exit code 非零。
+Runs `validate()` automatically. Non-zero exit on errors.
 
-### 8.2 编程应用
+### Programmatic
 
 ```ts
-import { loadPatch, applyPatch } from "dify-dsl-builder";
-const { description, steps } = loadPatch("my-patch.yml");
+import { loadPatch, applyPatch } from "@orangemust/dify-dsl-builder";
+
+const { description, steps } = loadPatch("patch.yml");
 const dsl = DifyDSL.parse(yamlStr);
 applyPatch(dsl, steps);
 dsl.save("output.yml");
 ```
 
-### 8.3 全部操作速查（17 种）
+### Quick Reference (15 operations)
 
-| 操作 | 用途 | 关键参数 |
-|------|------|----------|
-| `remove-edge` | 删除边 | `source`, `target`, `sourceHandle?` |
-| `add-edge` | 添加边 | `source`, `target`, `handle?` |
-| `remove-node` | 删除节点（自动清理关联边） | `id` |
-| `add-code-node` | 新增 Code 节点 | `id`, `title`, `code`, `code_language?`, `position?`, `variables?`, `outputs?` |
-| `add-classifier-class` | 给分类器新增分类 | `classifier`, `id`, `name` |
-| `set-title` | 修改节点标题 | `id`, `value` |
-| `set-desc` | 修改节点描述 | `id`, `value` |
-| `set-position` | 修改节点位置 | `id`, `x`, `y` |
-| `set-prompt` | 替换 LLM 提示词 | `id`, `role`, `replace`, `with` |
-| `set-answer` | 修改 Answer 节点模板 | `id`, `answer` |
-| `set-code` | 替换 Code 节点代码 | `id`, `replace`, `with` |
-| `set-start-var` | 修改 Start 节点变量字段 | `id`, `variable`, `field`, `value` |
-| `env-set` | 设置环境变量 | `name`, `value`, `type` |
-| `env-remove` | 删除环境变量 | `name` |
-| `conv-set` | 设置对话变量 | `name`, `value_type?` |
+| Operation | Purpose | Key Parameters |
+|-----------|---------|----------------|
+| `remove-edge` | Delete edge | `source`, `target`, `sourceHandle?` |
+| `add-edge` | Add edge | `source`, `target`, `handle?` |
+| `remove-node` | Delete node (auto-cleans edges) | `id` |
+| `add-code-node` | Create Code node | `id`, `title`, `code`, `code_language?`, `position?`, `variables?`, `outputs?` |
+| `add-classifier-class` | Add classifier class | `classifier`, `id`, `name` |
+| `set-title` | Modify node title | `id`, `value` |
+| `set-desc` | Modify node description | `id`, `value` |
+| `set-position` | Modify node position | `id`, `x`, `y` |
+| `set-prompt` | Replace LLM prompt text | `id`, `role`, `replace`, `with` |
+| `set-answer` | Modify Answer node template | `id`, `answer` |
+| `set-code` | Replace Code node code | `id`, `replace`, `with` |
+| `set-start-var` | Modify Start node variable | `id`, `variable`, `field`, `value` |
+| `env-set` | Set environment variable | `name`, `value`, `type` |
+| `env-remove` | Remove environment variable | `name` |
+| `conv-set` | Set conversation variable | `name`, `value_type?` |
 
-_`remove-edge` 会自动尝试 3 种 `sourceHandle`：指定值、`"true"`、`"false"`，方便处理 if-else 分支。_
-
-### 8.4 典型示例
-
-#### 删除节点并插入新 Code 节点
-
-```yaml
-description: 用 Code 节点替换旧模板节点
-steps:
-  - remove-edge: { source: "prev", target: "old-template" }
-  - remove-edge: { source: "old-template", target: "next" }
-  - remove-node: { id: "old-template" }
-  - add-code-node:
-      id: "new-code"
-      title: "替换节点"
-      code: |
-        def main(input: str) -> dict:
-            return {"result": input}
-      position: { x: 2000, y: 500 }
-  - add-edge: { source: "prev", target: "new-code" }
-  - add-edge: { source: "new-code", target: "next" }
-```
-
-#### 批量修改提示词
-
-```yaml
-description: 统一修改多个 LLM 节点的 system prompt
-steps:
-  - set-prompt: { id: "llm-1", role: "system", replace: "旧指令", with: "新指令 v2" }
-  - set-prompt: { id: "llm-2", role: "system", replace: "旧指令", with: "新指令 v2" }
-```
-
-#### 修改节点文本 + 位置
-
-```yaml
-description: 重命名并重排节点
-steps:
-  - set-title: { id: "llm-analysis", value: "智能分析 v2" }
-  - set-desc: { id: "llm-analysis", value: "增强后的分析节点" }
-  - set-position: { id: "llm-analysis", x: 1200, y: 300 }
-```
-
-
+_`remove-edge` tries 3 `sourceHandle` values: specified, `"true"`, `"false"` — covering if-else branches._

@@ -209,13 +209,15 @@ dsl.save("output.yml");
 | `role` | string | 是 | 匹配的消息 role（`"system"` / `"user"` / `"assistant"`） |
 | `replace` | string | 是 | 要替换的文本 |
 | `with` | string | 是 | 替换后的文本 |
+| `replaceAll` | boolean | 否 | 是否替换全部匹配，默认 `false`（只替换第一个） |
 
 ```yaml
 - set-prompt:
     id: "1747000021001"
     role: "system"
-    replace: "你是一位资深高考志愿填报专家。请根据以下信息为用户提供专业推荐。"
-    with: "你是一位资深高考志愿填报专家，请根据以下信息提供专业推荐。重点匹配本科院校。"
+    replace: "你是一位资深高考志愿填报专家"
+    with: "你是四川省高考志愿分析助手"
+    replaceAll: true
 ```
 
 ---
@@ -244,6 +246,7 @@ dsl.save("output.yml");
 | `id` | string | 是 | Code 节点 ID |
 | `replace` | string | 是 | 要替换的子串 |
 | `with` | string | 是 | 替换后的文本 |
+| `replaceAll` | boolean | 否 | 是否替换全部匹配，默认 `false` |
 
 ```yaml
 - set-code:
@@ -322,6 +325,55 @@ dsl.save("output.yml");
 
 ---
 
+### 3.16 `update-condition` — 修改 if-else 条件 (v1.0.4+)
+
+修改 if-else 或 question-classifier 节点的条件字段。
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | string | 是 | if-else 或 classifier 节点 ID |
+| `case_id` | string | 是 | case 的 `case_id`（如 `"true"`、`"false"`） |
+| `condition_index` | number | 否 | 条件索引，默认 0 |
+| `field` | string | 是 | 字段名：`value`、`comparison_operator`、`varType`、`variable_selector.0`（路径点号分隔） |
+| `value` | `string\|number` | 是 | 新值 |
+
+```yaml
+# 修改分数阈值从 450 改为 420
+- update-condition:
+    id: "1747500000001"
+    case_id: "true"
+    field: "value"
+    value: 420
+
+# 修改比较运算符
+- update-condition:
+    id: "1747500000001"
+    case_id: "true"
+    field: "comparison_operator"
+    value: ">"
+```
+
+_`field` 支持点号路径（如 `variable_selector.0`），可修改嵌套数组元素。_
+
+---
+
+### 3.17 `remove-classifier-class` — 删除分类器 class (v1.0.4+)
+
+与 `add-classifier-class` 配对，删除不再需要的分类。
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `classifier` | string | 是 | ClassifierNode 的 ID |
+| `id` | string | 是 | 要删除的 class ID |
+
+```yaml
+- remove-classifier-class:
+    classifier: "1780889576194"
+    id: "undergrad_school"
+```
+
+---
+
 ## 4. 典型模式
 
 ### 删除旧节点并插入新 Code 节点
@@ -362,6 +414,7 @@ steps:
 - **步骤顺序执行**：上一步的结果会影响下一步（例如先 `remove-node` 再 `add-edge` 引用已删除的节点会失败，因为 `addEdge` 要求两端节点存在）
 - **边 ID 自动生成**：`add-edge` 的边 ID 按 `{source}-{handle}-{target}-target` 拼接，`remove-edge` 也用同样规则匹配
 - **`remove-edge` 会尝试 3 次**：分别用指定的 sourceHandle、`true`、`false` 删除，适合 if-else 分支
-- **`set-prompt` 只替换第一个匹配项**：内部使用 `String.replace(search, with)`，如需全局替换，在 search 中用正则或重复多次
-- **`set-code` 同理**：`String.replace` 只替换首次出现
+- **`set-prompt` / `set-code` 默认替换第一个匹配项**：内部使用 `String.replace`，如需全局替换请加 `replaceAll: true`（使用 `String.replaceAll`）
+- **`remove-edge` 会尝试 3 次**：分别用指定的 sourceHandle、`true`、`false` 删除，适合 if-else 分支
 - **`env-set` 的 value 写数字**：即使 type 为 `"string"`，YAML 中也要写为字符串（加引号）
+- **`update-condition` 的 field 支持点号路径**：`comparison_operator`、`variable_selector.0` 等嵌套字段

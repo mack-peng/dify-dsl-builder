@@ -33,7 +33,10 @@ interface SetDescStep {
   "set-desc": { id: string; value: string };
 }
 interface SetPromptStep {
-  "set-prompt": { id: string; role: string; replace: string; with: string };
+  "set-prompt": { id: string; role: string; replace: string; with: string; replaceAll?: boolean };
+}
+interface SetCodeStep {
+  "set-code": { id: string; replace: string; with: string; replaceAll?: boolean };
 }
 interface SetPositionStep {
   "set-position": { id: string; x: number; y: number };
@@ -50,18 +53,26 @@ interface RemoveEnvStep {
 interface SetConvStep {
   "conv-set": { name: string; value_type?: string };
 }
-interface SetCodeStep {
-  "set-code": { id: string; replace: string; with: string };
-}
 interface SetStartVarStep {
   "set-start-var": { id: string; variable: string; field: string; value: string };
+}
+interface UpdateConditionStep {
+  "update-condition": {
+    id: string; case_id: string;
+    condition_index?: number;
+    field: string; value: string | number;
+  };
+}
+interface RemoveClassifierClassStep {
+  "remove-classifier-class": { classifier: string; id: string };
 }
 
 type PatchStep =
   | RemoveEdgeStep | RemoveNodeStep | AddEdgeStep | AddCodeNodeStep
   | AddClassifierClassStep | SetTitleStep | SetDescStep | SetPromptStep
-  | SetPositionStep | SetAnswerTemplateStep | SetEnvStep | RemoveEnvStep
-  | SetConvStep | SetCodeStep | SetStartVarStep;
+  | SetCodeStep | SetPositionStep | SetAnswerTemplateStep | SetEnvStep
+  | RemoveEnvStep | SetConvStep | SetStartVarStep
+  | UpdateConditionStep | RemoveClassifierClassStep;
 
 // ── Step appliers ──
 
@@ -126,7 +137,9 @@ function applyStep(dsl: DifyDSL, raw: Record<string, any>): void {
       if (llm) {
         for (const msg of (llm.data as any).prompt_template) {
           if (msg.role === val.role) {
-            msg.text = msg.text.replace(val.replace, val.with);
+            msg.text = val.replaceAll
+              ? (msg.text as string).replaceAll(val.replace, val.with)
+              : (msg.text as string).replace(val.replace, val.with);
           }
         }
       }
@@ -156,7 +169,11 @@ function applyStep(dsl: DifyDSL, raw: Record<string, any>): void {
     }
     case "set-code": {
       const c = dsl.findCode(val.id);
-      if (c) (c.data as any).code = (c.data as any).code.replace(val.replace, val.with);
+      if (c) {
+        (c.data as any).code = val.replaceAll
+          ? (c.data as any).code.replaceAll(val.replace, val.with)
+          : (c.data as any).code.replace(val.replace, val.with);
+      }
       break;
     }
     case "set-start-var": {
@@ -166,6 +183,41 @@ function applyStep(dsl: DifyDSL, raw: Record<string, any>): void {
           if (v.variable === val.variable) {
             v[val.field] = val.value;
           }
+        }
+      }
+      break;
+    }
+    case "update-condition": {
+      const n = dsl.getNode(val.id);
+      if (!n) break;
+      const cases = (n.data as any).cases;
+      if (!cases) break;
+      const caseIdx = cases.findIndex((c: any) => c.case_id === val.case_id);
+      if (caseIdx < 0) break;
+      const condIdx = val.condition_index ?? 0;
+      const cond = cases[caseIdx].conditions?.[condIdx];
+      if (!cond) break;
+      // Support dotted paths like "variable_selector.0"
+      const fields = val.field.split(".");
+      if (fields.length === 1) {
+        cond[val.field] = val.value;
+      } else {
+        let obj = cond;
+        for (let i = 0; i < fields.length - 1; i++) {
+          obj = obj[fields[i]];
+          if (!obj) break;
+        }
+        if (obj) obj[fields[fields.length - 1]] = val.value;
+      }
+      break;
+    }
+    case "remove-classifier-class": {
+      const cls = dsl.findClassifier(val.classifier);
+      if (cls) {
+        const classes = (cls.data as any).classes as any[];
+        if (classes) {
+          const idx = classes.findIndex((c: any) => c.id === val.id);
+          if (idx >= 0) classes.splice(idx, 1);
         }
       }
       break;

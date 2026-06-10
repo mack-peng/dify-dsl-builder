@@ -101,7 +101,9 @@ function applyStep(dsl, raw) {
             if (llm) {
                 for (const msg of llm.data.prompt_template) {
                     if (msg.role === val.role) {
-                        msg.text = msg.text.replace(val.replace, val.with);
+                        msg.text = val.replaceAll
+                            ? msg.text.replaceAll(val.replace, val.with)
+                            : msg.text.replace(val.replace, val.with);
                     }
                 }
             }
@@ -133,8 +135,11 @@ function applyStep(dsl, raw) {
         }
         case "set-code": {
             const c = dsl.findCode(val.id);
-            if (c)
-                c.data.code = c.data.code.replace(val.replace, val.with);
+            if (c) {
+                c.data.code = val.replaceAll
+                    ? c.data.code.replaceAll(val.replace, val.with)
+                    : c.data.code.replace(val.replace, val.with);
+            }
             break;
         }
         case "set-start-var": {
@@ -144,6 +149,49 @@ function applyStep(dsl, raw) {
                     if (v.variable === val.variable) {
                         v[val.field] = val.value;
                     }
+                }
+            }
+            break;
+        }
+        case "update-condition": {
+            const n = dsl.getNode(val.id);
+            if (!n)
+                break;
+            const cases = n.data.cases;
+            if (!cases)
+                break;
+            const caseIdx = cases.findIndex((c) => c.case_id === val.case_id);
+            if (caseIdx < 0)
+                break;
+            const condIdx = val.condition_index ?? 0;
+            const cond = cases[caseIdx].conditions?.[condIdx];
+            if (!cond)
+                break;
+            // Support dotted paths like "variable_selector.0"
+            const fields = val.field.split(".");
+            if (fields.length === 1) {
+                cond[val.field] = val.value;
+            }
+            else {
+                let obj = cond;
+                for (let i = 0; i < fields.length - 1; i++) {
+                    obj = obj[fields[i]];
+                    if (!obj)
+                        break;
+                }
+                if (obj)
+                    obj[fields[fields.length - 1]] = val.value;
+            }
+            break;
+        }
+        case "remove-classifier-class": {
+            const cls = dsl.findClassifier(val.classifier);
+            if (cls) {
+                const classes = cls.data.classes;
+                if (classes) {
+                    const idx = classes.findIndex((c) => c.id === val.id);
+                    if (idx >= 0)
+                        classes.splice(idx, 1);
                 }
             }
             break;

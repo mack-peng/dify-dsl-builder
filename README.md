@@ -36,6 +36,7 @@ dify-dsl-cli <command> [options]
 
 Commands:
   info       <file>              Print node/edge stats
+  flow       <file>              Print workflow topology tree (for AI agents)
   roundtrip  <input> [output]    Parse → save, verify round-trip
   validate   <file>              Run Ruby DSL validator (external script)
   apply      <patch> -i <in> -o <out>  Apply YAML patch file

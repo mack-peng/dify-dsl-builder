@@ -46,6 +46,7 @@ Commands:
   roundtrip <input> [output]     Load YAML → save, verify round-trip
   validate   <file>              Run Ruby DSL validator
   info       <file>              Print node/edge stats
+  flow       <file>              Print workflow topology (tree view for agents)
   apply      <patch> -i <in> -o <out>  Apply YAML patch file
 
 Atomic commands:
@@ -115,6 +116,99 @@ function cmd_info(args) {
     console.log("\nNode types:");
     for (const [t, c] of [...types].sort((a, b) => b[1] - a[1])) {
         console.log(`  ${t.padEnd(24)} ${c}`);
+    }
+}
+function cmd_flow(args) {
+    const file = resolvePath(args[0]);
+    if (!fs.existsSync(file))
+        fail(`File not found: ${file}`);
+    const str = fs.readFileSync(file, "utf-8");
+    const dsl = DifyDSL_1.DifyDSL.parse(str);
+    console.log(`# ${dsl.app.name}`);
+    console.log(`Mode: ${dsl.mode} | ${dsl.nodeCount} nodes, ${dsl.edgeCount} edges\n`);
+    // Find start nodes (no incoming edges → root)
+    const roots = [];
+    for (const n of dsl.index.byId.values()) {
+        if (dsl.getPrevIds(n.id).length === 0 && !n.parentId) {
+            roots.push(n.id);
+        }
+    }
+    const visited = new Set();
+    const typeLabel = {
+        start: "START", llm: "LLM", code: "CODE", answer: "ANSWER",
+        "if-else": "IF", "question-classifier": "CLASS", tool: "TOOL",
+        "knowledge-retrieval": "KB", "template-transform": "TMPL",
+        "variable-aggregator": "AGGR", iteration: "ITER",
+        "http-request": "HTTP", "document-extractor": "DOC",
+    };
+    function label(n) {
+        const t = typeLabel[n.data.type] || n.data.type;
+        return `[${t}] ${n.id.slice(-6)} ${n.title || ""}`;
+    }
+    function getBranches(id) {
+        return dsl.index.getOutEdges(id).map(e => ({
+            handle: e.sourceHandle,
+            target: e.target,
+        }));
+    }
+    function tree(targetIds, prefix, isLast) {
+        const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
+        for (let i = 0; i < ids.length; i++) {
+            const id = ids[i];
+            const last = i === ids.length - 1;
+            const isLeaf = isLast[isLast.length - 1] && last;
+            const connector = isLeaf ? "└─ " : "├─ ";
+            const childPrefix = isLeaf ? "   " : "│  ";
+            if (visited.has(id)) {
+                const n = dsl.getNode(id);
+                console.log(prefix + connector + `↳ [${typeLabel[n?.data.type || "?"] || "?"}] ${id.slice(-6)} (see above)`);
+                continue;
+            }
+            visited.add(id);
+            const n = dsl.getNode(id);
+            if (!n) {
+                console.log(prefix + connector + `? ${id.slice(-6)} (not found)`);
+                continue;
+            }
+            const branches = getBranches(id);
+            if (branches.length === 0) {
+                console.log(prefix + connector + label(n));
+            }
+            else if (branches.length === 1) {
+                const b = branches[0];
+                console.log(prefix + connector + label(n));
+                tree(b.target, prefix + childPrefix, [...isLast, last]);
+            }
+            else {
+                // Branching node — show node then each branch
+                console.log(prefix + connector + label(n));
+                for (let j = 0; j < branches.length; j++) {
+                    const b = branches[j];
+                    const bLast = j === branches.length - 1;
+                    const bConn = bLast ? "└─ " : "├─ ";
+                    const bPrefix = bLast ? "   " : "│  ";
+                    console.log(prefix + childPrefix + bConn + `▶ ${b.handle}`);
+                    tree(b.target, prefix + childPrefix + bPrefix, [...isLast, last]);
+                }
+            }
+        }
+    }
+    for (const rootId of roots) {
+        tree(rootId, "", [true]);
+    }
+    // Summarize iteration containers
+    if (dsl.index.byParent.size > 0) {
+        console.log("\n## Iterations");
+        for (const [parentId, childIds] of dsl.index.byParent) {
+            const parent = dsl.getNode(parentId);
+            if (parent?.data.type === "iteration") {
+                console.log(`\n${label(parent)}`);
+                for (const cid of childIds) {
+                    const c = dsl.getNode(cid);
+                    console.log(`  - ${label(c)}`);
+                }
+            }
+        }
     }
 }
 function cmd_apply(patchFile, input, output) {
@@ -236,6 +330,11 @@ async function main() {
             if (args.length < 1)
                 fail("Usage: dify-dsl-cli info <file>");
             cmd_info(args);
+            break;
+        case "flow":
+            if (args.length < 1)
+                fail("Usage: dify-dsl-cli flow <file>");
+            cmd_flow(args);
             break;
         case "apply":
             if (args.length < 1)

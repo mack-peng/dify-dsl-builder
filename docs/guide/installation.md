@@ -31,7 +31,8 @@ The user provides two files:
 Your process:
 
 ```
-1. Inspect DSL  →  npx dify-dsl-cli info <file>
+1. Inspect DSL  →  npx dify-dsl-cli flow <file>   (see full topology)
+                →  npx dify-dsl-cli info <file>   (see stats)
 2. Read requirements → analyze each item
 3. Create a technical plan → decide per-item approach
 4. Choose execution path:
@@ -145,6 +146,7 @@ import { DifyDSL, CodeNode } from "@orangemust/dify-dsl-builder";
 dify-dsl-cli <command> [options]
 
 Commands:
+  flow       <file>              Print workflow topology tree
   info       <file>              Print node/edge stats
   roundtrip  <input> [output]    Parse → save, verify round-trip
   validate   <file>              Run Ruby DSL validator

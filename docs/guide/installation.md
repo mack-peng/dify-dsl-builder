@@ -439,6 +439,33 @@ new IterationStartNode("parent-iteration-id", {
 
 注意：`IterationStartNode` 的 ID 自动由父迭代 ID + `-start` 拼接而成。构造后手动设为 `iter.startNode = iterStart`。
 
+### 4.13 `HTTPNode`
+
+```ts
+new HTTPNode("id-http", {
+  title: "HTTP 请求",
+  desc: "调用外部 API",
+  method: "GET",                        // GET | POST | PUT | DELETE | PATCH | HEAD
+  url: "https://api.example.com/data",
+  authorization: { type: "no-auth" },   // no-auth | api-key | custom
+  headers: "",
+  params: "",
+  body: { type: "none", data: "" },     // none | form-data | x-www-form-urlencoded | raw-text | json
+  timeout: { connect: 10, read: 30, write: 30 },
+});
+```
+
+### 4.14 `DocNode`（文档提取器）
+
+```ts
+new DocNode("id-doc", {
+  title: "提取文档",
+  desc: "从上游节点提取文档内容",
+  variable_selector: ["upstream-id", "result"],
+  is_array_file: false,                 // 可选
+});
+```
+
 ---
 
 ## 5. 各 Node 子类的方法
@@ -554,6 +581,20 @@ new IterationStartNode("parent-iteration-id", {
 .removeClass(id)
 .setModel(provider, name)
 .setInstructions(s)
+```
+
+### 5.12 `HTTPNode`
+
+```ts
+.setMethod(method)        // "GET" | "POST" | "PUT" | "DELETE"
+.setUrl(url)
+.setBody(type, data)
+```
+
+### 5.13 `DocNode`
+
+```ts
+.setVariableSelector(nodeId, field)
 ```
 
 ---

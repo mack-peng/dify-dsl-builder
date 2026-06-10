@@ -137,8 +137,8 @@ npx tsx src/cli.ts apply examples/patch-all-steps.yml \
 | `iteration` | `IterationNode` | `addChild(n)`, `removeChild(id)`, `setIterator(id,f)` |
 | `tool` | `ToolNode` | `setPlugin(id,uid)`, `setToolParam(k,v)`, `setToolConfig(k,v)` |
 | `question-classifier` | `ClassifierNode` | `addClass(c)`, `setModel(p,n)`, `setInstructions(s)` |
-| `http-request` | `HTTPNode` | (stub) |
-| `document-extractor` | `DocNode` | (stub) |
+| `http-request` | `HTTPNode` | `setMethod(m)`, `setUrl(u)`, `setBody(type,data)` |
+| `document-extractor` | `DocNode` | `setVariableSelector(id,field)` |
 
 ## License
 

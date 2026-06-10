@@ -76,10 +76,4 @@ export interface Viewport {
   zoom: number;
 }
 
-// ─── Node finding results ───
-export interface EdgeRef {
-  edge: EdgeData;
-  source: string;
-  target: string;
-  sourceHandle: string;
-}
+

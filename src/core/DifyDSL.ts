@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as yaml from "js-yaml";
 import { BaseNode } from "../nodes/base";
+import { NODE_TYPE_MAP, IterationStartNode } from "../nodes/index";
 import { NodeIndex } from "./NodeIndex";
 import { DifyDSLJSON, AppMeta, Dependency, Viewport, EdgeData } from "./types";
 
@@ -297,8 +298,6 @@ export class DifyDSL {
 
 // ─────── Internal helpers ───────
 
-import { NODE_TYPE_MAP, IterationStartNode } from "../nodes/index";
-
 function buildNodes(rawNodes: Record<string, unknown>[]): BaseNode<any>[] {
   const nodes: BaseNode<any>[] = [];
   const pendingStart: Record<string, unknown>[] = [];
@@ -323,10 +322,13 @@ function buildNodes(rawNodes: Record<string, unknown>[]): BaseNode<any>[] {
     nodes.push(node as BaseNode<any>);
   }
 
+  // Build id→node map for O(1) parent lookup in pass 2
+  const nodeById = new Map(nodes.map(n => [n.id, n]));
+
   // Pass 2: wire iteration-start + children to their parent
   for (const rn of pendingStart) {
     const parentId = rn.parentId as string;
-    const parent = nodes.find(n => n.id === parentId);
+    const parent = nodeById.get(parentId);
     if (!parent) continue;
     const dtype = (rn.data as Record<string, unknown>)?.type as string;
 

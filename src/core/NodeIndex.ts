@@ -103,15 +103,10 @@ export class NodeIndex {
   // ─── Internal ───
 
   private _removeEdgesFor(id: string): void {
-    const toRemove: string[] = [];
-    for (const [eid, e] of this.edges) {
-      if (e.source === id || e.target === id) {
-        toRemove.push(eid);
-      }
-    }
-    for (const eid of toRemove) {
-      this.removeEdge(eid);
-    }
+    const toRemove = new Set<string>();
+    for (const eid of this.outEdges.get(id) ?? []) toRemove.add(eid);
+    for (const eid of this.inEdges.get(id) ?? []) toRemove.add(eid);
+    for (const eid of toRemove) this.removeEdge(eid);
   }
 
   /** Populate from flat arrays (used during initial parse) */

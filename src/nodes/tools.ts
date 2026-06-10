@@ -234,7 +234,16 @@ export class HTTPNode extends BaseNode<HTTPNodeData> {
 
   static override fromYAML(raw: Record<string, unknown>): HTTPNode {
     const d = raw.data as Record<string, unknown>;
-    return new HTTPNode(raw.id as string, { title: d.title as string, desc: d.desc as string });
+    return new HTTPNode(raw.id as string, {
+      title: d.title as string, desc: d.desc as string,
+      method: d.method as string,
+      url: d.url as string,
+      authorization: d.authorization as { type: string },
+      headers: d.headers as string,
+      params: d.params as string,
+      body: d.body as { type: string; data: string },
+      timeout: d.timeout as { connect: number; read: number; write: number },
+    });
   }
 }
 
@@ -263,6 +272,10 @@ export class DocNode extends BaseNode<DocNodeData> {
 
   static override fromYAML(raw: Record<string, unknown>): DocNode {
     const d = raw.data as Record<string, unknown>;
-    return new DocNode(raw.id as string, { title: d.title as string, desc: d.desc as string });
+    return new DocNode(raw.id as string, {
+      title: d.title as string, desc: d.desc as string,
+      variable_selector: d.variable_selector as [string, string],
+      is_array_file: d.is_array_file as boolean,
+    });
   }
 }

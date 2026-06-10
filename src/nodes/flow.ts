@@ -36,6 +36,11 @@ export class KnowledgeNode extends BaseNode<KnowledgeNodeData> {
         top_k: this.data.multiple_retrieval_config.top_k,
       };
     }
+    if (this.data.retrieval_mode === "single" && this.data.single_retrieval_config) {
+      extra.single_retrieval_config = {
+        model: { ...this.data.single_retrieval_config.model },
+      };
+    }
     return this.outerJSON(this.dataJSON(extra));
   }
 
@@ -66,6 +71,7 @@ export class KnowledgeNode extends BaseNode<KnowledgeNodeData> {
       query_variable_selector: d.query_variable_selector as [string, string],
       retrieval_mode: d.retrieval_mode as "single" | "multiple",
       multiple_retrieval_config: d.multiple_retrieval_config as any,
+      single_retrieval_config: d.single_retrieval_config as any,
     });
     node.setPosition((raw.position as XY).x, (raw.position as XY).y);
     node.width = raw.width as number;

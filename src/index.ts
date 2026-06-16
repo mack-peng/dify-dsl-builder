@@ -6,6 +6,7 @@
 export { DifyDSL } from "./core/DifyDSL";
 export { BaseNode } from "./nodes/base";
 export { EdgeData, DifyDSLJSON, AppMeta, Dependency, Viewport } from "./core/types";
+export { Diagnostic, ValidationReport } from "./types/validation";
 
 // Node types
 export {

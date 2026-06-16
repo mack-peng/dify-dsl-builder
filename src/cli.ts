@@ -28,7 +28,7 @@ Atomic commands (modify file in place):
   node set-title      <file> <id> <title>
   node set-desc       <file> <id> <desc>
   node set-prompt     <file> <id> <role> <replace> <with>
-  node set-code       <file> <id> <replace> <with>
+  node set-code       <file> <id[,id2,...]> <replace> <with>
   node set-condition  <file> <id> <case_id> <field> <value>
   edge add            <file> <src> <tgt> [handle]
   edge remove         <file> <src> <tgt> [handle]

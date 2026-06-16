@@ -415,6 +415,5 @@ steps:
 - **边 ID 自动生成**：`add-edge` 的边 ID 按 `{source}-{handle}-{target}-target` 拼接，`remove-edge` 也用同样规则匹配
 - **`remove-edge` 会尝试 3 次**：分别用指定的 sourceHandle、`true`、`false` 删除，适合 if-else 分支
 - **`set-prompt` / `set-code` 默认替换第一个匹配项**：内部使用 `String.replace`，如需全局替换请加 `replaceAll: true`（使用 `String.replaceAll`）
-- **`remove-edge` 会尝试 3 次**：分别用指定的 sourceHandle、`true`、`false` 删除，适合 if-else 分支
 - **`env-set` 的 value 写数字**：即使 type 为 `"string"`，YAML 中也要写为字符串（加引号）
 - **`update-condition` 的 field 支持点号路径**：`comparison_operator`、`variable_selector.0` 等嵌套字段

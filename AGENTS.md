@@ -74,7 +74,7 @@ Reads/manipulates/writes **Dify DSL YAML** (`app.yml` exported from Dify Studio)
 ## CLI behaviors
 
 - `roundtrip` / `validate` shell out to Ruby to run `scripts/validate-dsl.rb` from the current package. Errors are caught and printed, not fatal. Requires Ruby runtime.
-- `apply` runs `dsl.validate()` after patching, exits non-zero on validation errors. Validate checks: Start/Answer node existence, edge node refs, code output types, env/conv variable schema completeness (`id`+`selector`+value-type match), LLM `context`/`vision` required fields.
+- `apply` runs `dsl.validate()` after patching, exits non-zero on validation errors. Returns `ValidationReport` with structured `Diagnostic[]` arrays (`severity`, `code`, `nodeId?`, `edgeId?`, `message`). Validate checks: Start/Answer node existence, edge node refs, code output types, env/conv variable schema completeness (`id`+`selector`+value-type match), LLM `context`/`vision` required fields, if-else env/conv variable references.
 - Atomic commands (`node set-title`, `edge add`, etc.) modify the file in place
 
 ## Input/output conventions

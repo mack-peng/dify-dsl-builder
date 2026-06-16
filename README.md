@@ -55,7 +55,7 @@ dify-dsl-cli validate <file>             # Ruby DSL validator (requires Ruby run
 ### Apply Patches
 
 ```
-dify-dsl-cli apply <patch.yml> -i <in> -o <out>   # 19 patch operations + auto-validation
+dify-dsl-cli apply <patch.yml> -i <in> -o <out>   # 17 patch operations + auto-validation
 ```
 
 ### Atomic Modify (in-place)
@@ -65,7 +65,7 @@ dify-dsl-cli remove           <file> <id>
 dify-dsl-cli node set-title    <file> <id> <title>
 dify-dsl-cli node set-desc     <file> <id> <desc>
 dify-dsl-cli node set-prompt   <file> <id> <role> <replace> <with>
-dify-dsl-cli node set-code     <file> <id> <replace> <with>
+dify-dsl-cli node set-code     <file> <id[,id2,...]> <replace> <with>
 dify-dsl-cli node set-condition <file> <id> <case_id> <field> <value>
 dify-dsl-cli edge add          <file> <src> <tgt> [handle]
 dify-dsl-cli edge remove       <file> <src> <tgt> [handle]

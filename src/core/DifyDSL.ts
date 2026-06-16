@@ -4,6 +4,7 @@ import { BaseNode } from "../nodes/base";
 import { NODE_TYPE_MAP, IterationStartNode } from "../nodes/index";
 import { NodeIndex } from "./NodeIndex";
 import { DifyDSLJSON, AppMeta, Dependency, Viewport, EdgeData } from "./types";
+import { Diagnostic, ValidationReport, createReport, addError, addWarning } from "../types/validation";
 
 /**
  * 7-step pipeline:
@@ -262,24 +263,31 @@ export class DifyDSL {
 
   // ─────── Validation ───────
 
-  validate(): { errors: { message: string }[]; warnings: { message: string }[] } {
-    const errors: { message: string }[] = [];
-    const warnings: { message: string }[] = [];
+  validate(): ValidationReport {
+    const report = createReport();
 
     // 1. Start node exists
     const starts = this.findByType("start");
-    if (starts.length === 0) errors.push({ message: "Missing Start node" });
-    if (starts.length > 1) warnings.push({ message: "Multiple Start nodes" });
+    if (starts.length === 0) {
+      addError(report, { severity: "error", code: "missing-start", message: "Missing Start node" });
+    }
+    if (starts.length > 1) {
+      addWarning(report, { severity: "warning", code: "multiple-starts", message: "Multiple Start nodes" });
+    }
 
     // 2. Answer/End check
     if (this.app.mode === "advanced-chat" && this.findByType("answer").length === 0) {
-      errors.push({ message: "advanced-chat mode requires Answer node" });
+      addError(report, { severity: "error", code: "missing-answer", message: "advanced-chat mode requires Answer node" });
     }
 
     // 3. Edge node refs
     for (const e of this.index.edges.values()) {
-      if (!this.index.byId.has(e.source)) errors.push({ message: `Edge source '${e.source}' not found` });
-      if (!this.index.byId.has(e.target)) errors.push({ message: `Edge target '${e.target}' not found` });
+      if (!this.index.byId.has(e.source)) {
+        addError(report, { severity: "error", code: "edge-source-not-found", edgeId: e.id, message: `Edge source '${e.source}' not found` });
+      }
+      if (!this.index.byId.has(e.target)) {
+        addError(report, { severity: "error", code: "edge-target-not-found", edgeId: e.id, message: `Edge target '${e.target}' not found` });
+      }
     }
 
     // 4. Code output types
@@ -292,30 +300,30 @@ export class DifyDSL {
       const outputs = (n as any).data.outputs || {};
       for (const [name, out] of Object.entries(outputs as Record<string, any>)) {
         if (!validTypes.has(out.type)) {
-          errors.push({ message: `Code ${n.id} output '${name}' type '${out.type}' is invalid` });
+          addError(report, { severity: "error", code: "code-output-type", nodeId: n.id, message: `Code ${n.id} output '${name}' type '${out.type}' is invalid` });
         }
       }
     }
 
     // 5. Environment variables must have id + selector
     for (const ev of this.envVariables as any[]) {
-      if (!ev.id) errors.push({ message: `Env variable '${ev.name}' missing 'id'` });
-      if (!ev.selector || !ev.selector.length) errors.push({ message: `Env variable '${ev.name}' missing 'selector'` });
+      if (!ev.id) addError(report, { severity: "error", code: "env-missing-id", message: `Env variable '${ev.name}' missing 'id'` });
+      if (!ev.selector || !ev.selector.length) addError(report, { severity: "error", code: "env-missing-selector", message: `Env variable '${ev.name}' missing 'selector'` });
     }
 
     // 6. Conversation variables must have id + selector + value matches type
     for (const cv of this.convVariables as any[]) {
-      if (!cv.id) errors.push({ message: `Conv variable '${cv.name}' missing 'id'` });
-      if (!cv.selector || !cv.selector.length) errors.push({ message: `Conv variable '${cv.name}' missing 'selector'` });
+      if (!cv.id) addError(report, { severity: "error", code: "conv-missing-id", message: `Conv variable '${cv.name}' missing 'id'` });
+      if (!cv.selector || !cv.selector.length) addError(report, { severity: "error", code: "conv-missing-selector", message: `Conv variable '${cv.name}' missing 'selector'` });
       if (cv.value_type === "number" && typeof cv.value !== "number") {
-        errors.push({ message: `Conv variable '${cv.name}' value_type=number but value is ${typeof cv.value}` });
+        addError(report, { severity: "error", code: "conv-value-type-mismatch", message: `Conv variable '${cv.name}' value_type=number but value is ${typeof cv.value}` });
       }
     }
 
     // 7. LLM nodes must have context + vision fields
     for (const n of this.findByType("llm")) {
-      if (!(n as any).data.context) errors.push({ message: `LLM ${n.id} missing 'context' field` });
-      if (!(n as any).data.vision) errors.push({ message: `LLM ${n.id} missing 'vision' field` });
+      if (!(n as any).data.context) addError(report, { severity: "error", code: "llm-missing-context", nodeId: n.id, message: `LLM ${n.id} missing 'context' field` });
+      if (!(n as any).data.vision) addError(report, { severity: "error", code: "llm-missing-vision", nodeId: n.id, message: `LLM ${n.id} missing 'vision' field` });
     }
 
     // 8. if-else conditions must not reference env/conversation variables
@@ -324,7 +332,10 @@ export class DifyDSL {
         for (const c of cs.conditions || []) {
           const sel = c.variable_selector || [];
           if (sel[0] === "env" || sel[0] === "conversation") {
-            errors.push({
+            addError(report, {
+              severity: "error",
+              code: `if-else-${sel[0]}-ref`,
+              nodeId: n.id,
               message: `if-else ${n.id}: condition variable_selector ["${sel.join('", "')}"] references ${sel[0]} variable — Dify does not support env/conversation in if-else conditions. Insert a Code node to bridge.`,
             });
           }
@@ -332,7 +343,7 @@ export class DifyDSL {
       }
     }
 
-    return { errors, warnings };
+    return report;
   }
 
   /**

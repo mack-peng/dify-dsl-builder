@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback } from "react";
 import { DifyDSL } from "../core/DifyDSL";
 import type { EdgeData } from "../core/types";
 
@@ -10,7 +10,6 @@ const App: React.FC = () => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<"detail" | "yaml" | "json" | "console">("console");
   const [expandTypes, setExpandTypes] = useState<Set<string>>(new Set(["start", "llm", "code"]));
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const appendLog = useCallback((msg: string) => {
     setLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);

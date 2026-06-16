@@ -17,7 +17,7 @@ dependencies:
     marketplace_plugin_unique_identifier: qianfan/baidu_ai_search:0.0.1@97821ba294ff49a4d7fabb6746bfd7993373e27c2a110efd684865bf21f2ff6e
     version: null
 kind: app
-version: 0.5.0
+version: 0.6.0
 workflow:
   conversation_variables: []
   environment_variables: []

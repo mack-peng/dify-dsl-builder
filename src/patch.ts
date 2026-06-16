@@ -2,6 +2,7 @@ import * as yaml from "js-yaml";
 import * as fs from "fs";
 import { DifyDSL } from "./core/DifyDSL";
 import { CodeNode } from "./nodes/code";
+import { LLMNode } from "./nodes/chat";
 
 // ── Patch step types ──
 
@@ -21,6 +22,18 @@ interface AddCodeNodeStep {
     position?: { x: number; y: number };
     variables?: { variable: string; value_selector: [string, string]; value_type?: string }[];
     outputs?: Record<string, { type: string }>;
+  };
+}
+interface AddLLMNodeStep {
+  "add-llm-node": {
+    id: string; title: string; desc?: string;
+    model: { provider: string; name: string; mode: "chat" | "completion"; completion_params?: Record<string, unknown> };
+    prompt_template: { id?: string; role: "system" | "user" | "assistant"; text: string }[];
+    context?: { enabled: boolean; variable_selector: string[] };
+    vision?: { enabled: boolean };
+    memory?: { window: { enabled: boolean; size: number }; query_prompt_template: string; role_prefix?: { assistant: string; user: string } };
+    prompt_config?: { jinja2_variables: unknown[] };
+    position?: { x: number; y: number };
   };
 }
 interface AddClassifierClassStep {
@@ -69,6 +82,7 @@ interface RemoveClassifierClassStep {
 
 type PatchStep =
   | RemoveEdgeStep | RemoveNodeStep | AddEdgeStep | AddCodeNodeStep
+  | AddLLMNodeStep
   | AddClassifierClassStep | SetTitleStep | SetDescStep | SetPromptStep
   | SetCodeStep | SetPositionStep | SetAnswerTemplateStep | SetEnvStep
   | RemoveEnvStep | SetConvStep | SetStartVarStep
@@ -111,6 +125,21 @@ function applyStep(dsl: DifyDSL, raw: Record<string, any>): void {
       if (val.outputs) {
         node.data.outputs = val.outputs as any;
       }
+      dsl.addNode(node);
+      if (val.position) node.setPosition(val.position.x, val.position.y);
+      break;
+    }
+    case "add-llm-node": {
+      const node = new LLMNode(val.id, {
+        title: val.title,
+        desc: val.desc || "",
+        model: val.model || { provider: "", name: "", mode: "chat", completion_params: {} },
+        prompt_template: val.prompt_template || [],
+        context: val.context ?? { enabled: false, variable_selector: [] },
+        vision: val.vision ?? { enabled: false },
+        memory: val.memory,
+        prompt_config: val.prompt_config,
+      });
       dsl.addNode(node);
       if (val.position) node.setPosition(val.position.x, val.position.y);
       break;

@@ -1,4 +1,4 @@
-description: "演示 patch 系统全部 17 种操作步骤"
+description: "演示 patch 系统全部 18 种操作步骤"
 steps:
   # ── 1. remove-edge: 删除一条边 ──
   - remove-edge:
@@ -38,73 +38,96 @@ steps:
       outputs:
         result: { type: "string" }
 
-  # ── 6. remove-node: 删除一个节点 ──
+  # ── 6. add-llm-node: 新增一个 LLM 节点 ──
+  - add-llm-node:
+      id: "ex-llm-001"
+      title: "示例 LLM 节点"
+      desc: "通过 patch 新增的 LLM 节点"
+      model:
+        provider: "openai"
+        name: "gpt-4o-mini"
+        mode: "chat"
+        completion_params:
+          temperature: 0.7
+      prompt_template:
+        - role: "system"
+          text: "You are a helpful assistant."
+        - role: "user"
+          text: "{{#sys.query#}}"
+      context:
+        enabled: false
+        variable_selector: []
+      vision:
+        enabled: false
+      position: { x: 1000, y: 500 }
+
+  # ── 7. remove-node: 删除一个节点 ──
   - remove-node:
       id: "1782000000002"
 
-  # ── 7. set-title: 修改节点标题 ──
+  # ── 8. set-title: 修改节点标题 ──
   - set-title:
       id: "1747000006001"
       value: "【补丁修改】兴趣分析→推荐专业"
 
-  # ── 8. set-desc: 修改节点描述 ──
+  # ── 9. set-desc: 修改节点描述 ──
   - set-desc:
       id: "1747000006001"
       value: "此描述已被 patch 修改"
 
-  # ── 9. set-position: 修改节点位置 ──
+  # ── 10. set-position: 修改节点位置 ──
   - set-position:
       id: "1780889576194"
       x: 730
       y: 250
 
-  # ── 10. set-prompt: 替换 LLM 提示词中的文本 ──
+  # ── 11. set-prompt: 替换 LLM 提示词中的文本 ──
   - set-prompt:
       id: "1747000021001"
       role: "system"
       replace: "你是一位资深高考志愿填报专家。请根据以下信息为用户提供专业推荐。"
       with: "你是一位资深高考志愿填报专家，请根据以下信息提供专业推荐。重点匹配本科院校。"
 
-  # ── 11. set-answer: 修改 Answer 节点模板 ──
+  # ── 12. set-answer: 修改 Answer 节点模板 ──
   - set-answer:
       id: "1747000024001"
       answer: "{{#ex-code-001.result#}}"
 
-  # ── 12. add-classifier-class: 给分类器新增一个分类 ──
+  # ── 13. add-classifier-class: 给分类器新增一个分类 ──
   - add-classifier-class:
       classifier: "1780889576194"
       id: "undergrad_school"
       name: "本科学校/专业推荐"
 
-  # ── 13. set-code: 替换代码节点中的文本 ──
+  # ── 14. set-code: 替换代码节点中的文本 ──
   - set-code:
       id: "1747000003001"
       replace: "def main"
       with: "# PATCHED\n# This code was modified by a patch\ndef main"
 
-  # ── 14. set-start-var: 修改 Start 节点变量字段 ──
+  # ── 15. set-start-var: 修改 Start 节点变量字段 ──
   - set-start-var:
       id: "1747000000001"
       variable: "gaokao_score"
       field: "label"
       value: "高考总分（已修改）"
 
-  # ── 15. env-set: 设置环境变量 ──
+  # ── 16. env-set: 设置环境变量 ──
   - env-set:
       name: "GAOKAO_BENKE_LINE"
       value: 450
       type: "number"
 
-  # ── 16. env-remove: 删除环境变量 ──
+  # ── 17. env-remove: 删除环境变量 ──
   - env-remove:
       name: "GAOKAO_MIN_VALID"
 
-  # ── 17. conv-set: 设置对话变量 ──
+  # ── 18. conv-set: 设置对话变量 ──
   - conv-set:
       name: "user_interest"
       value_type: "string"
 
-  # ── 18. update-condition: 修改 if-else 条件 ──
+  # ── 19. update-condition: 修改 if-else 条件 ──
   - update-condition:
       id: "1747500000001"
       case_id: "true"
@@ -112,7 +135,7 @@ steps:
       field: "value"
       value: 420
 
-  # ── 19. remove-classifier-class: 删除分类器 class ──
+  # ── 20. remove-classifier-class: 删除分类器 class ──
   - remove-classifier-class:
       classifier: "1780889576194"
       id: "undergrad_school"

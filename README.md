@@ -49,7 +49,7 @@ dify-dsl-cli path <file> <from> <to>     # shortest path between nodes
 ```
 dify-dsl-cli diff <yml1> <yml2>          # semantic diff (nodes, edges, prompts, conditions)
 dify-dsl-cli roundtrip <in> [out]        # parse → save, verify fidelity
-dify-dsl-cli validate <file>             # Ruby DSL validator (external)
+dify-dsl-cli validate <file>             # Ruby DSL validator (requires Ruby runtime)
 ```
 
 ### Apply Patches

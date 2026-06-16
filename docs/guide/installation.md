@@ -84,7 +84,7 @@ steps:
   - conv-set: { name: "user_profile", value_type: "string" }
 ```
 
-Full operation reference: `docs/guide/patch.md` (17 operations).
+Full operation reference: `docs/guide/patch.md` (18 operations).
 
 After writing:
 1. Show the patch to the user for confirmation
@@ -663,7 +663,7 @@ dsl.addEdge("new-code", "downstream");
 
 ## 9. YAML Patch System
 
-Declaratively modify DSL via YAML patch files. See the full guide at `docs/guide/patch.md` (17 operations) and examples at `examples/patch-all-steps.yml`.
+Declaratively modify DSL via YAML patch files. See the full guide at `docs/guide/patch.md` (18 operations) and examples at `examples/patch-all-steps.yml`.
 
 ### CLI
 
@@ -684,7 +684,7 @@ applyPatch(dsl, steps);
 dsl.save("output.yml");
 ```
 
-### Quick Reference (17 operations)
+### Quick Reference (18 operations)
 
 | Operation | Purpose | Key Parameters |
 |-----------|---------|----------------|
@@ -692,6 +692,7 @@ dsl.save("output.yml");
 | `add-edge` | Add edge | `source`, `target`, `handle?` |
 | `remove-node` | Delete node (auto-cleans edges) | `id` |
 | `add-code-node` | Create Code node | `id`, `title`, `code`, `code_language?`, `position?`, `variables?`, `outputs?` |
+| `add-llm-node` | Create LLM node | `id`, `title`, `model`, `prompt_template`, `context?`, `vision?`, `memory?`, `prompt_config?`, `position?` |
 | `add-classifier-class` | Add classifier class | `classifier`, `id`, `name` |
 | `set-title` | Modify node title | `id`, `value` |
 | `set-desc` | Modify node description | `id`, `value` |

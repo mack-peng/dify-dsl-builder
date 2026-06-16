@@ -12,6 +12,7 @@
     "docs",
     "examples",
     "references",
+    "scripts",
     "README.md"
   ],
   "scripts": {

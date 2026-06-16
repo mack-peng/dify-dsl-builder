@@ -87,7 +87,7 @@ function cmd_roundtrip(args) {
     console.log(`Save: ${output}`);
     // Validate
     try {
-        const script = path.join(__dirname, "..", "..", "dify-builder-agent", "scripts", "validate-dsl.rb");
+        const script = path.join(__dirname, "..", "scripts", "validate-dsl.rb");
         const result = (0, node_child_process_1.execSync)(`ruby "${script}" "${output}" 2>&1`, { encoding: "utf-8", timeout: 10000 });
         console.log(result);
     }
@@ -99,7 +99,7 @@ function cmd_validate(args) {
     const file = resolvePath(args[0]);
     if (!fs.existsSync(file))
         fail(`File not found: ${file}`);
-    const script = path.join(__dirname, "..", "..", "dify-builder-agent", "scripts", "validate-dsl.rb");
+    const script = path.join(__dirname, "..", "scripts", "validate-dsl.rb");
     try {
         const result = (0, node_child_process_1.execSync)(`ruby "${script}" "${file}" 2>&1`, { encoding: "utf-8", timeout: 10000 });
         console.log(result);

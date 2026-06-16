@@ -222,10 +222,12 @@ const yaml = dsl.toYAML();    // yaml.dump string
 dsl.save("output.yml");       // toYAML() + writeFileSync
 
 const report = dsl.validate();
-// { errors: [{ message: "..." }], warnings: [{ message: "..." }] }
+// { ok: boolean, errors: Diagnostic[], warnings: Diagnostic[] }
+// Diagnostic: { severity, code, nodeId?, edgeId?, message }
+```
 ```
 
-Validation checks: Start node exists, Answer node exists (advanced-chat), edge node refs, code output types, env/conv variable schema completeness (`id` + `selector` + value-type match), LLM `context`/`vision` required fields.
+Validation checks: Start node exists, Answer node exists (advanced-chat), edge node refs, code output types, env/conv variable schema completeness (`id` + `selector` + value-type match), LLM `context`/`vision` required fields, if-else condition variable selectors must not reference env/conversation variables.
 
 ### 4.4 Properties Reference
 

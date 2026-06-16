@@ -682,7 +682,7 @@ applyPatch(dsl, steps);
 dsl.save("output.yml");
 ```
 
-### Quick Reference (15 operations)
+### Quick Reference (17 operations)
 
 | Operation | Purpose | Key Parameters |
 |-----------|---------|----------------|
@@ -701,5 +701,7 @@ dsl.save("output.yml");
 | `env-set` | Set environment variable | `name`, `value`, `type` |
 | `env-remove` | Remove environment variable | `name` |
 | `conv-set` | Set conversation variable | `name`, `value_type?` |
+| `update-condition` | Modify if-else condition | `id`, `case_id`, `field`, `value` |
+| `remove-classifier-class` | Remove classifier class | `classifier`, `id` |
 
 _`remove-edge` tries 3 `sourceHandle` values: specified, `"true"`, `"false"` — covering if-else branches._

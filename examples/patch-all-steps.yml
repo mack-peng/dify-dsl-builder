@@ -1,4 +1,4 @@
-description: "演示 patch 系统全部 19 种操作步骤"
+description: "演示 patch 系统全部 17 种操作步骤"
 steps:
   # ── 1. remove-edge: 删除一条边 ──
   - remove-edge:

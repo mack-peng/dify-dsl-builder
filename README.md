@@ -94,7 +94,7 @@ dify-dsl-cli diff app.yml patched.yml
 
 ## YAML Patch System
 
-Declaratively modify Dify DSL via YAML patch files. **19 operations** — see full guide at [`docs/guide/patch.md`](docs/guide/patch.md).
+Declaratively modify Dify DSL via YAML patch files. **17 operations** — see full guide at [`docs/guide/patch.md`](docs/guide/patch.md).
 
 ```yaml
 description: My patch

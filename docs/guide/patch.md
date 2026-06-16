@@ -23,7 +23,7 @@ steps:
 ### CLI
 
 ```bash
-npx tsx src/cli.ts apply <patch.yml> -i <input.yml> -o <output.yml>
+npx dify-dsl-cli apply <patch.yml> -i <input.yml> -o <output.yml>
 ```
 
 apply 会在补丁完成后自动调用 `dsl.validate()`，校验失败则退出码非零。
@@ -31,7 +31,7 @@ apply 会在补丁完成后自动调用 `dsl.validate()`，校验失败则退出
 ### 编程方式
 
 ```ts
-import { loadPatch, applyPatch } from "dify-dsl-builder";
+import { loadPatch, applyPatch } from "@orangemust/dify-dsl-builder";
 
 const { description, steps } = loadPatch("my-patch.yml");
 const dsl = DifyDSL.parse(yamlStr);

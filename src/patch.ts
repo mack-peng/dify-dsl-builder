@@ -267,7 +267,12 @@ function applyStep(dsl: DifyDSL, raw: Record<string, any>): void {
 // ── Public API ──
 
 export function loadPatch(filePath: string): { steps: Record<string, any>[]; description?: string } {
-  const raw = yaml.load(fs.readFileSync(filePath, "utf-8")) as Record<string, any>;
+  let raw: Record<string, any>;
+  try {
+    raw = yaml.load(fs.readFileSync(filePath, "utf-8")) as Record<string, any>;
+  } catch {
+    throw new Error(`Patch file not found or invalid: ${filePath}`);
+  }
   return {
     description: raw.description as string,
     steps: raw.steps as Record<string, any>[],

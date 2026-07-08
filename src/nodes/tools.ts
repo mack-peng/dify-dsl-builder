@@ -1,5 +1,5 @@
 import { BaseNode } from "./base";
-import { XY, BaseNodeData, ParamSchema, ToolParamValue, ModelConfig, ClassDefinition } from "../types/common";
+import { BaseNodeData, ParamSchema, ToolParamValue, ModelConfig, ClassDefinition } from "../types/common";
 
 // ─── Tool Node ───
 interface ToolNodeData extends BaseNodeData {
@@ -117,10 +117,7 @@ export class ToolNode extends BaseNode<ToolNodeData> {
       tool_node_version: d.tool_node_version as string,
       tool_parameters: d.tool_parameters as Record<string, ToolParamValue>,
     });
-    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
-    node.width = raw.width as number;
-    node.height = raw.height as number;
-    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
+    BaseNode.applyCommon(node, raw);
     return node;
   }
 }
@@ -190,10 +187,7 @@ export class ClassifierNode extends BaseNode<ClassifierNodeData> {
       classes: d.classes as ClassDefinition[],
       instructions: d.instructions as string,
     });
-    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
-    node.width = raw.width as number;
-    node.height = raw.height as number;
-    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
+    BaseNode.applyCommon(node, raw);
     return node;
   }
 }
@@ -234,7 +228,7 @@ export class HTTPNode extends BaseNode<HTTPNodeData> {
 
   static override fromYAML(raw: Record<string, unknown>): HTTPNode {
     const d = raw.data as Record<string, unknown>;
-    return new HTTPNode(raw.id as string, {
+    const node = new HTTPNode(raw.id as string, {
       title: d.title as string, desc: d.desc as string,
       method: d.method as string,
       url: d.url as string,
@@ -244,6 +238,8 @@ export class HTTPNode extends BaseNode<HTTPNodeData> {
       body: d.body as { type: string; data: string },
       timeout: d.timeout as { connect: number; read: number; write: number },
     });
+    BaseNode.applyCommon(node, raw);
+    return node;
   }
 }
 
@@ -272,10 +268,12 @@ export class DocNode extends BaseNode<DocNodeData> {
 
   static override fromYAML(raw: Record<string, unknown>): DocNode {
     const d = raw.data as Record<string, unknown>;
-    return new DocNode(raw.id as string, {
+    const node = new DocNode(raw.id as string, {
       title: d.title as string, desc: d.desc as string,
       variable_selector: d.variable_selector as [string, string],
       is_array_file: d.is_array_file as boolean,
     });
+    BaseNode.applyCommon(node, raw);
+    return node;
   }
 }

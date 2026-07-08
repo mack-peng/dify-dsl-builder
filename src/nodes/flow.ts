@@ -1,5 +1,5 @@
 import { BaseNode } from "./base";
-import { XY, BaseNodeData, NodeVariable, IfCase, ModelConfig } from "../types/common";
+import { BaseNodeData, NodeVariable, IfCase, ModelConfig } from "../types/common";
 
 // ─── Knowledge Retrieval Node ───
 interface KnowledgeNodeData extends BaseNodeData {
@@ -73,10 +73,7 @@ export class KnowledgeNode extends BaseNode<KnowledgeNodeData> {
       multiple_retrieval_config: d.multiple_retrieval_config as any,
       single_retrieval_config: d.single_retrieval_config as any,
     });
-    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
-    node.width = raw.width as number;
-    node.height = raw.height as number;
-    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
+    BaseNode.applyCommon(node, raw);
     return node;
   }
 }
@@ -135,10 +132,7 @@ export class IfElseNode extends BaseNode<IfElseNodeData> {
       title: d.title as string, desc: d.desc as string,
       cases: d.cases as IfCase[],
     });
-    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
-    node.width = raw.width as number;
-    node.height = raw.height as number;
-    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
+    BaseNode.applyCommon(node, raw);
     return node;
   }
 }
@@ -188,10 +182,7 @@ export class TemplateNode extends BaseNode<TemplateNodeData> {
       template: d.template as string,
       variables: d.variables as NodeVariable[],
     });
-    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
-    node.width = raw.width as number;
-    node.height = raw.height as number;
-    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
+    BaseNode.applyCommon(node, raw);
     return node;
   }
 }
@@ -237,10 +228,7 @@ export class AggregatorNode extends BaseNode<AggregatorNodeData> {
       output_type: d.output_type as string,
       variables: d.variables as [string, string][],
     });
-    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
-    node.width = raw.width as number;
-    node.height = raw.height as number;
-    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
+    BaseNode.applyCommon(node, raw);
     return node;
   }
 }
@@ -344,10 +332,7 @@ export class IterationNode extends BaseNode<IterationNodeData> {
       error_handle_mode: d.error_handle_mode as string,
       width: d.width as number, height: d.height as number,
     });
-    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
-    node.width = raw.width as number;
-    node.height = raw.height as number;
-    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
+    BaseNode.applyCommon(node, raw);
     return node;
   }
 }
@@ -411,9 +396,7 @@ export class IterationStartNode extends BaseNode<IterStartNodeData> {
       height: d.height as number, width: d.width as number,
     });
     node.id = raw.id as string;
-    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
-    node.width = raw.width as number;
-    node.height = raw.height as number;
+    BaseNode.applyCommon(node, raw);
     return node;
   }
 }

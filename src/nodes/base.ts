@@ -112,4 +112,12 @@ export abstract class BaseNode<T extends BaseNodeData> {
   static fromYAML(raw: Record<string, unknown>): BaseNode<any> {
     throw new Error("fromYAML not implemented");
   }
+
+  /** Apply common position/size/zIndex from raw YAML to a created node — avoid duplicate 4-line tail in every fromYAML */
+  protected static applyCommon(node: BaseNode<any>, raw: Record<string, unknown>): void {
+    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
+    node.width = raw.width as number;
+    node.height = raw.height as number;
+    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
+  }
 }

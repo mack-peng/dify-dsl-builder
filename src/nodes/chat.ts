@@ -1,5 +1,5 @@
 import { BaseNode } from "./base";
-import { XY, BaseNodeData, PromptMessage, ModelConfig, MemoryConfig } from "../types/common";
+import { BaseNodeData, PromptMessage, ModelConfig, MemoryConfig } from "../types/common";
 
 // ─── StartVariable ───
 export interface StartVariable {
@@ -62,7 +62,6 @@ export class StartNode extends BaseNode<StartNodeData> {
 
   static override fromYAML(raw: Record<string, unknown>): StartNode {
     const node = new StartNode(raw.id as string);
-    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
     const d = raw.data as Record<string, unknown>;
     node.data.title = d.title as string;
     node.data.desc = d.desc as string;
@@ -70,9 +69,7 @@ export class StartNode extends BaseNode<StartNodeData> {
       ...v,
       options: v.options ?? [],
     }));
-    node.width = raw.width as number;
-    node.height = raw.height as number;
-    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
+    BaseNode.applyCommon(node, raw);
     return node;
   }
 }
@@ -130,11 +127,8 @@ export class AnswerNode extends BaseNode<AnswerNodeData> {
       title: d.title as string, desc: d.desc as string,
       answer: d.answer as string,
     });
-    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
+    BaseNode.applyCommon(node, raw);
     node.data.variables = (d.variables as AnswerNodeData["variables"]) ?? [];
-    node.width = raw.width as number;
-    node.height = raw.height as number;
-    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
     return node;
   }
 }
@@ -263,10 +257,7 @@ export class LLMNode extends BaseNode<LLMNodeData> {
       memory: d.memory as MemoryConfig,
       prompt_config: d.prompt_config as PromptConfig,
     });
-    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
-    node.width = raw.width as number;
-    node.height = raw.height as number;
-    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
+    BaseNode.applyCommon(node, raw);
     return node;
   }
 }

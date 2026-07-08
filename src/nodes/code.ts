@@ -1,5 +1,5 @@
 import { BaseNode } from "./base";
-import { XY, BaseNodeData, NodeVariable, CodeOutput } from "../types/common";
+import { BaseNodeData, NodeVariable, CodeOutput } from "../types/common";
 
 interface CodeNodeData extends BaseNodeData {
   type: "code";
@@ -79,10 +79,7 @@ export class CodeNode extends BaseNode<CodeNodeData> {
       variables: d.variables as NodeVariable[],
       outputs: d.outputs as Record<string, CodeOutput>,
     });
-    node.setPosition((raw.position as XY).x, (raw.position as XY).y);
-    node.width = raw.width as number;
-    node.height = raw.height as number;
-    if (raw.zIndex !== undefined) node.zIndex = raw.zIndex as number;
+    BaseNode.applyCommon(node, raw);
     return node;
   }
 }

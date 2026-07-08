@@ -40,18 +40,23 @@ function fail(msg: string): never {
   process.exit(1);
 }
 
-function resolvePath(p: string): string {
-  return path.isAbsolute(p) ? p : path.resolve(p);
+function readFileOrFail(p: string): string {
+  try {
+    return fs.readFileSync(p, "utf-8");
+  } catch {
+    fail(`File not found: ${p}`);
+  }
 }
+
+function resolvePath(p: string): string { return path.resolve(p); }
 
 // ── Commands ──
 
 function cmd_roundtrip(args: string[]) {
   const input = resolvePath(args[0]);
   const output = args[1] ? resolvePath(args[1]) : input.replace(/\.yml$/, ".roundtrip.yml");
-  if (!fs.existsSync(input)) fail(`File not found: ${input}`);
 
-  const str = fs.readFileSync(input, "utf-8");
+  const str = readFileOrFail(input);
   const dsl = DifyDSL.parse(str);
   console.log(`Load: ${dsl.nodeCount} nodes, ${dsl.edgeCount} edges, mode=${dsl.mode}`);
   dsl.save(output);
@@ -69,7 +74,6 @@ function cmd_roundtrip(args: string[]) {
 
 function cmd_validate(args: string[]) {
   const file = resolvePath(args[0]);
-  if (!fs.existsSync(file)) fail(`File not found: ${file}`);
   const script = path.join(__dirname, "..", "scripts", "validate-dsl.rb");
   try {
     const result = execSync(`ruby "${script}" "${file}" 2>&1`, { encoding: "utf-8", timeout: 10000 });
@@ -81,8 +85,7 @@ function cmd_validate(args: string[]) {
 
 function cmd_info(args: string[]) {
   const file = resolvePath(args[0]);
-  if (!fs.existsSync(file)) fail(`File not found: ${file}`);
-  const str = fs.readFileSync(file, "utf-8");
+  const str = readFileOrFail(file);
   const dsl = DifyDSL.parse(str);
   console.log(`File:     ${file}`);
   console.log(`Mode:     ${dsl.mode}`);
@@ -118,8 +121,7 @@ function cmd_flow(args: string[]) {
   const useShort = args.includes("--short");
   const fileArgs = args.filter(a => a !== "--short");
   const file = resolvePath(fileArgs[0]);
-  if (!fs.existsSync(file)) fail(`File not found: ${file}`);
-  const str = fs.readFileSync(file, "utf-8");
+  const str = readFileOrFail(file);
   const dsl = DifyDSL.parse(str);
 
   console.log(`# ${dsl.app.name}`);
@@ -208,10 +210,9 @@ function cmdNodeShow(args: string[]) {
   const fileArgs = args.filter(a => a !== "--json");
   const file = resolvePath(fileArgs[0]);
   const id = fileArgs[1];
-  if (!fs.existsSync(file)) fail(`File not found: ${file}`);
   if (!id) fail("Usage: dify-dsl-cli node show <file> <id> [--json]");
 
-  const str = fs.readFileSync(file, "utf-8");
+  const str = readFileOrFail(file);
   const dsl = DifyDSL.parse(str);
   const n = dsl.getNode(id);
   if (!n) fail(`Node not found: ${id}`);
@@ -422,9 +423,8 @@ function cmdNodeShow(args: string[]) {
 function cmdNodeList(args: string[]) {
   const file = resolvePath(args[0]);
   const filterType = args[1];
-  if (!fs.existsSync(file)) fail(`File not found: ${file}`);
 
-  const str = fs.readFileSync(file, "utf-8");
+  const str = readFileOrFail(file);
   const dsl = DifyDSL.parse(str);
 
   const nodes = filterType
@@ -449,10 +449,8 @@ function cmdNodeList(args: string[]) {
 function cmdFind(args: string[]) {
   const file = resolvePath(args[0]);
   const query = args.slice(1).join(" ");
-  if (!fs.existsSync(file)) fail(`File not found: ${file}`);
   if (!query) fail("Usage: dify-dsl-cli find <file> <text>");
-
-  const str = fs.readFileSync(file, "utf-8");
+  const str = readFileOrFail(file);
   const dsl = DifyDSL.parse(str);
 
   const matches: { id: string; type: string; title: string; field: string; preview: string }[] = [];
@@ -505,10 +503,7 @@ function cmdFind(args: string[]) {
 }
 
 function cmd_apply(patchFile: string, input: string, output: string) {
-  if (!fs.existsSync(input)) fail(`File not found: ${input}`);
-  if (!fs.existsSync(patchFile)) fail(`Patch file not found: ${patchFile}`);
-
-  const str = fs.readFileSync(input, "utf-8");
+  const str = readFileOrFail(input);
   const dsl = DifyDSL.parse(str);
   const { description, steps } = loadPatch(patchFile);
   if (description) console.log(`Patch: ${description}`);
@@ -534,8 +529,7 @@ function cmd_apply(patchFile: string, input: string, output: string) {
 
 function atomicNode(args: string[], fileIdx: number, action: (dsl: DifyDSL) => void) {
   const file = resolvePath(args[fileIdx]);
-  if (!fs.existsSync(file)) fail(`File not found: ${file}`);
-  const str = fs.readFileSync(file, "utf-8");
+  const str = readFileOrFail(file);
   const dsl = DifyDSL.parse(str);
   action(dsl);
   dsl.save(file);
@@ -649,11 +643,9 @@ function atomNodeSetCode(args: string[]) {
 function cmdDiff(args: string[]) {
   const fileA = resolvePath(args[0]);
   const fileB = resolvePath(args[1]);
-  if (!fs.existsSync(fileA)) fail(`File not found: ${fileA}`);
-  if (!fs.existsSync(fileB)) fail(`File not found: ${fileB}`);
 
-  const strA = fs.readFileSync(fileA, "utf-8");
-  const strB = fs.readFileSync(fileB, "utf-8");
+  const strA = readFileOrFail(fileA);
+  const strB = readFileOrFail(fileB);
   const a = DifyDSL.parse(strA);
   const b = DifyDSL.parse(strB);
 
@@ -750,8 +742,7 @@ function cmdDiff(args: string[]) {
 function cmdEdgeList(args: string[]) {
   const file = resolvePath(args[0]);
   const filterId = args[1];
-  if (!fs.existsSync(file)) fail(`File not found: ${file}`);
-  const str = fs.readFileSync(file, "utf-8");
+  const str = readFileOrFail(file);
   const dsl = DifyDSL.parse(str);
 
   const edges = filterId ? dsl.getNodeEdges(filterId) : [...dsl.index.edges.values()];
@@ -773,10 +764,9 @@ function cmdPath(args: string[]) {
   const file = resolvePath(args[0]);
   const from = args[1];
   const to = args[2];
-  if (!fs.existsSync(file)) fail(`File not found: ${file}`);
   if (!from || !to) fail("Usage: dify-dsl-cli path <file> <from-id> <to-id>");
 
-  const str = fs.readFileSync(file, "utf-8");
+  const str = readFileOrFail(file);
   const dsl = DifyDSL.parse(str);
 
   // BFS

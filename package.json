@@ -4,6 +4,9 @@
   "description": "CLI tool and TypeScript library for reading, manipulating, and writing Dify DSL YAML files",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "engines": {
+    "node": ">=18"
+  },
   "bin": {
     "dify-dsl-cli": "dist/cli.js"
   },

@@ -768,7 +768,7 @@ function parseParamValue(v: string): unknown {
   if (v === "null") return null;
   if (/^-?\d+(\.\d+)?$/.test(v)) return Number(v);
   try {
-    if (/^[[{"\d]/.test(v)) return JSON.parse(v);
+    if (/^["[{]/.test(v)) return JSON.parse(v);
   } catch { /* fall through */ }
   return v;
 }
@@ -860,6 +860,42 @@ function cmdDiff(args: string[]) {
   const strB = readFileOrFail(fileB);
   const a = DifyDSL.parse(strA);
   const b = DifyDSL.parse(strB);
+
+  // completion 应用：比较 pre_prompt / model / user_input_form
+  if (a.isCompletion || b.isCompletion) {
+    if (a.isCompletion !== b.isCompletion) {
+      console.log(`Mode mismatch: A=${a.mode}${a.isCompletion ? "(completion)" : ""} B=${b.mode}${b.isCompletion ? "(completion)" : ""}`);
+      return;
+    }
+    const changed: string[] = [];
+
+    const ap = a.getPrePrompt() ?? "";
+    const bp = b.getPrePrompt() ?? "";
+    if (ap !== bp) changed.push(`  pre_prompt changed (${ap.length} → ${bp.length} chars)`);
+
+    const am = a.getCompletionModel();
+    const bm = b.getCompletionModel();
+    if (JSON.stringify(am?.completion_params ?? {}) !== JSON.stringify(bm?.completion_params ?? {})) {
+      changed.push(`  model.completion_params changed`);
+    }
+    if (am?.provider !== bm?.provider || am?.name !== bm?.name || am?.mode !== bm?.mode) {
+      changed.push(`  model changed (${am?.provider}/${am?.name}/${am?.mode} → ${bm?.provider}/${bm?.name}/${bm?.mode})`);
+    }
+
+    const aForm = a.getInputForm().map((i) => JSON.stringify(i));
+    const bForm = b.getInputForm().map((i) => JSON.stringify(i));
+    if (JSON.stringify(aForm) !== JSON.stringify(bForm)) {
+      changed.push(`  user_input_form changed (${aForm.length} → ${bForm.length} variables)`);
+    }
+
+    if (changed.length) {
+      console.log(`${changed.length} field changes:`);
+      for (const c of changed) console.log(c);
+    } else {
+      console.log("No changes detected.");
+    }
+    return;
+  }
 
   console.log(`A: ${a.nodeCount}n ${a.edgeCount}e  B: ${b.nodeCount}n ${b.edgeCount}e\n`);
 

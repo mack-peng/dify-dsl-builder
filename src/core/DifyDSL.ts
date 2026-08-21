@@ -172,11 +172,14 @@ export class DifyDSL {
     this.completionConfig.pre_prompt = text;
   }
 
-  /** completion 应用：替换 pre_prompt 中的文本（精确/正则均支持） */
+  /** completion 应用：替换 pre_prompt 中的文本（精确/正则均支持），返回替换次数 */
   replacePrePrompt(search: string | RegExp, replacement: string): number {
     if (!this.completionConfig) throw new Error("Not a completion app");
-    const next = this.completionConfig.pre_prompt.replace(search, replacement);
-    const count = this.completionConfig.pre_prompt !== next ? 1 : 0;
+    let count = 0;
+    const next = this.completionConfig.pre_prompt.replace(search, (...args) => {
+      count += 1;
+      return replacement;
+    });
     this.completionConfig.pre_prompt = next;
     return count;
   }
@@ -351,7 +354,7 @@ export class DifyDSL {
         kind: "app",
         app: { ...this.app },
         dependencies: [...this.dependencies],
-        model_config: structuredClone(this.completionConfig),
+        model_config: JSON.parse(JSON.stringify(this.completionConfig)),
       };
     }
 

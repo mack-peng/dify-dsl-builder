@@ -11,8 +11,8 @@ export function checkCompletionConfig(
   app: AppMeta,
 ): void {
   if (app.mode !== "completion") {
-    addWarning(report, {
-      severity: "warning",
+    addError(report, {
+      severity: "error",
       code: "completion-mode-mismatch",
       message: `app.mode is '${app.mode}' but file has model_config (no workflow) — expected 'completion'`,
     });

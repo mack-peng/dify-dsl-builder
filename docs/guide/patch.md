@@ -458,3 +458,27 @@ steps:
 - **`set-prompt` / `set-code` 默认替换第一个匹配项**：内部使用 `String.replace`，如需全局替换请加 `replaceAll: true`（使用 `String.replaceAll`）
 - **`env-set` 的 value 写数字**：即使 type 为 `"string"`，YAML 中也要写为字符串（加引号）
 - **`update-condition` 的 field 支持点号路径**：`comparison_operator`、`variable_selector.0` 等嵌套字段
+
+---
+
+## 6. Completion 应用（不支持 patch）
+
+YAML patch 系统面向**有 graph 的 workflow / advanced-chat 应用**（所有操作都是节点/边/环境变量）。**completion 应用（无 workflow，顶层是 `model_config`）不能用 `apply`**，`loadPatch`/`applyPatch` 会因找不到节点而失败。
+
+completion 应用请改用 `completion` 子命令或 `DifyDSL` 的 completion 方法（详见 `docs/guide/installation.md` §1.2.1、§4.3.1）：
+
+```bash
+# 替代 set-prompt
+npx dify-dsl-cli completion set-prompt app.yml @prompt.txt
+npx dify-dsl-cli completion replace app.yml "旧文本" "新文本"
+
+# 替代 env-set / conv-set（completion 用 model.completion_params）
+npx dify-dsl-cli completion set-param app.yml temperature 0.6
+npx dify-dsl-cli completion set-max-tokens app.yml 2048
+
+# 输入变量
+npx dify-dsl-cli completion add-input app.yml user_input "用户输入" true
+npx dify-dsl-cli completion remove-input app.yml old_var
+```
+
+判断应用类型：`npx dify-dsl-cli info <file>`，`Mode: completion` 即无 graph 应用。

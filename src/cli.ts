@@ -33,6 +33,19 @@ Atomic commands (modify file in place):
   edge add            <file> <src> <tgt> [handle]
   edge remove         <file> <src> <tgt> [handle]
   remove              <file> <id>
+
+Completion app commands (无 graph，顶层 model_config):
+  completion show          <file>              Show pre_prompt, model, input form
+  completion set-prompt    <file> <text>       Replace whole pre_prompt (use @file to read from file)
+  completion replace       <file> <search> <with>  Replace substring/regex in pre_prompt
+  completion set-param     <file> <name> <value>   Set model.completion_params.<name> (value: number|boolean|JSON)
+  completion remove-param  <file> <name>       Delete model.completion_params.<name>
+  completion set-model     <file> <provider> <name> [mode]  Set model provider/name/mode
+  completion set-max-tokens <file> <number>    Shortcut for set-param max_tokens
+  completion set-temperature <file> <number>   Shortcut for set-param temperature
+  completion add-input     <file> <variable> <label> [required]
+  completion remove-input  <file> <variable>
+  completion set-label     <file> <variable> <label>
 `;
 
 function fail(msg: string): never {
@@ -91,6 +104,19 @@ function cmd_info(args: string[]) {
   console.log(`Mode:     ${dsl.mode}`);
   console.log(`Nodes:    ${dsl.nodeCount}`);
   console.log(`Edges:    ${dsl.edgeCount}`);
+
+  if (dsl.isCompletion) {
+    const model = dsl.getCompletionModel();
+    console.log(`App:      ${dsl.app.name}`);
+    if (model) {
+      console.log(`Model:    ${model.provider}/${model.name} (${model.mode})`);
+      console.log(`Params:   ${JSON.stringify(model.completion_params)}`);
+    }
+    const prompt = dsl.getPrePrompt() ?? "";
+    console.log(`Prompt:   ${prompt.length} chars`);
+    console.log(`Inputs:   ${dsl.getInputForm().length} variables`);
+    return;
+  }
 
   const types = new Map<string, number>();
   for (const n of dsl.index.byId.values()) {
@@ -455,6 +481,32 @@ function cmdFind(args: string[]) {
 
   const matches: { id: string; type: string; title: string; field: string; preview: string }[] = [];
 
+  // completion 应用：搜索 pre_prompt
+  if (dsl.isCompletion) {
+    const prompt = dsl.getPrePrompt() ?? "";
+    const idx = prompt.toLowerCase().indexOf(query.toLowerCase());
+    if (idx >= 0) {
+      const start = Math.max(0, idx - 20);
+      const end = Math.min(prompt.length, idx + query.length + 30);
+      matches.push({
+        id: "(completion)", type: "completion", title: dsl.app.name,
+        field: "pre_prompt",
+        preview: (start > 0 ? "…" : "") + prompt.slice(start, end).replace(/\n/g, "↵") + (end < prompt.length ? "…" : ""),
+      });
+    }
+    for (const item of dsl.getInputForm()) {
+      const entry = item["text-input"] as any;
+      if (!entry) continue;
+      if (entry.label?.toLowerCase().includes(query.toLowerCase())) {
+        matches.push({
+          id: "(completion)", type: "completion", title: dsl.app.name,
+          field: `input.${entry.variable}.label`,
+          preview: entry.label,
+        });
+      }
+    }
+  }
+
   for (const n of dsl.index.byId.values()) {
     const d = n.data as any;
 
@@ -636,6 +688,166 @@ function atomNodeSetCode(args: string[]) {
       (c.data as any).code = (c.data as any).code.replace(args[2], args[3]);
     }
   });
+}
+
+// ── completion 应用命令 ──
+
+function requireCompletion(dsl: DifyDSL): void {
+  if (!dsl.isCompletion) fail("Not a completion app (no model_config). Use node/edge commands for workflow apps.");
+}
+
+function completionLoad(file: string): DifyDSL {
+  const str = readFileOrFail(file);
+  const dsl = DifyDSL.parse(str);
+  requireCompletion(dsl);
+  return dsl;
+}
+
+function cmdCompletionShow(args: string[]) {
+  const file = resolvePath(args[0]);
+  const dsl = completionLoad(file);
+
+  console.log(`File:     ${file}`);
+  console.log(`Name:     ${dsl.app.name}`);
+  console.log(`Mode:     ${dsl.app.mode}`);
+
+  const model = dsl.getCompletionModel();
+  if (model) {
+    console.log(`\n-- Model --`);
+    console.log(`Provider: ${model.provider}`);
+    console.log(`Model:    ${model.name} | ${model.mode}`);
+    console.log(`Params:   ${JSON.stringify(model.completion_params, null, 2)}`);
+  }
+
+  console.log(`\n-- Input Form (${dsl.getInputForm().length} variables) --`);
+  for (const item of dsl.getInputForm()) {
+    const entry = item["text-input"] as any;
+    if (entry) {
+      console.log(`  ${entry.variable}: "${entry.label}" required=${entry.required ?? false}`);
+    }
+  }
+
+  const prompt = dsl.getPrePrompt() ?? "";
+  console.log(`\n-- Pre Prompt (${prompt.length} chars) --`);
+  console.log(prompt);
+}
+
+function cmdCompletionSetPrompt(args: string[]) {
+  const file = resolvePath(args[0]);
+  const dsl = completionLoad(file);
+
+  let text = args[1] ?? "";
+  if (text.startsWith("@")) {
+    const p = resolvePath(text.slice(1));
+    text = readFileOrFail(p);
+  }
+  const before = dsl.getPrePrompt()?.length ?? 0;
+  dsl.setPrePrompt(text);
+  dsl.save(file);
+  console.log(`pre_prompt updated: ${before} → ${text.length} chars`);
+  console.log(`Saved: ${file}`);
+}
+
+function cmdCompletionReplace(args: string[]) {
+  const file = resolvePath(args[0]);
+  const dsl = completionLoad(file);
+  const search = args[1];
+  const with_ = args[2] ?? "";
+  const before = dsl.getPrePrompt() ?? "";
+  const n = dsl.replacePrePrompt(search, with_);
+  if (n === 0) fail(`No match for "${search}"`);
+  dsl.save(file);
+  const after = dsl.getPrePrompt() ?? "";
+  console.log(`Replaced (${before.length} → ${after.length} chars)`);
+  console.log(`Saved: ${file}`);
+}
+
+function parseParamValue(v: string): unknown {
+  if (v === "true") return true;
+  if (v === "false") return false;
+  if (v === "null") return null;
+  if (/^-?\d+(\.\d+)?$/.test(v)) return Number(v);
+  try {
+    if (/^[[{"\d]/.test(v)) return JSON.parse(v);
+  } catch { /* fall through */ }
+  return v;
+}
+
+function cmdCompletionSetParam(args: string[]) {
+  const file = resolvePath(args[0]);
+  const dsl = completionLoad(file);
+  const name = args[1];
+  const value = parseParamValue(args[2] ?? "");
+  dsl.setCompletionParam(name, value);
+  dsl.save(file);
+  console.log(`completion_params.${name} = ${JSON.stringify(value)}`);
+  console.log(`Saved: ${file}`);
+}
+
+function cmdCompletionRemoveParam(args: string[]) {
+  const file = resolvePath(args[0]);
+  const dsl = completionLoad(file);
+  dsl.removeCompletionParam(args[1]);
+  dsl.save(file);
+  console.log(`completion_params.${args[1]} removed`);
+  console.log(`Saved: ${file}`);
+}
+
+function cmdCompletionSetModel(args: string[]) {
+  const file = resolvePath(args[0]);
+  const dsl = completionLoad(file);
+  const model = dsl.getCompletionModel();
+  if (!model) fail("No model in completion app");
+  if (args[1]) model.provider = args[1];
+  if (args[2]) model.name = args[2];
+  if (args[3]) {
+    if (args[3] !== "chat" && args[3] !== "completion") fail(`Invalid mode: ${args[3]}`);
+    model.mode = args[3];
+  }
+  dsl.save(file);
+  console.log(`model = ${model.provider}/${model.name} (${model.mode})`);
+  console.log(`Saved: ${file}`);
+}
+
+function cmdCompletionAddInput(args: string[]) {
+  const file = resolvePath(args[0]);
+  const dsl = completionLoad(file);
+  const variable = args[1];
+  const label = args[2] ?? variable;
+  const required = (args[3] ?? "true").toLowerCase() !== "false";
+  if (dsl.getInputVariable(variable)) fail(`Variable already exists: ${variable}`);
+  dsl.addInputVariable(variable, label, required);
+  dsl.save(file);
+  console.log(`added input: ${variable} "${label}" required=${required}`);
+  console.log(`Saved: ${file}`);
+}
+
+function cmdCompletionRemoveInput(args: string[]) {
+  const file = resolvePath(args[0]);
+  const dsl = completionLoad(file);
+  const ok = dsl.removeInputVariable(args[1]);
+  if (!ok) fail(`Variable not found: ${args[1]}`);
+  dsl.save(file);
+  console.log(`removed input: ${args[1]}`);
+  console.log(`Saved: ${file}`);
+}
+
+function cmdCompletionSetLabel(args: string[]) {
+  const file = resolvePath(args[0]);
+  const dsl = completionLoad(file);
+  const ok = dsl.setInputLabel(args[1], args[2]);
+  if (!ok) fail(`Variable not found: ${args[1]}`);
+  dsl.save(file);
+  console.log(`label updated: ${args[1]} → "${args[2]}"`);
+  console.log(`Saved: ${file}`);
+}
+
+function cmdCompletionSetMaxTokens(args: string[]) {
+  cmdCompletionSetParam([args[0], "max_tokens", args[1]]);
+}
+
+function cmdCompletionSetTemperature(args: string[]) {
+  cmdCompletionSetParam([args[0], "temperature", args[1]]);
 }
 
 // ── diff ──
@@ -916,6 +1128,61 @@ async function main() {
     case "remove":
       if (args.length < 2) fail("Usage: dify-dsl-cli remove <file> <id>");
       atomRemove(args);
+      break;
+    case "completion":
+      if (args.length < 1) fail("Usage: dify-dsl-cli completion <subcommand> ...");
+      {
+        const sub = args[0];
+        const rest = args.slice(1);
+        switch (sub) {
+          case "show":
+            if (rest.length < 1) fail("Usage: dify-dsl-cli completion show <file>");
+            cmdCompletionShow(rest);
+            break;
+          case "set-prompt":
+            if (rest.length < 2) fail("Usage: dify-dsl-cli completion set-prompt <file> <text|@file>");
+            cmdCompletionSetPrompt(rest);
+            break;
+          case "replace":
+            if (rest.length < 3) fail("Usage: dify-dsl-cli completion replace <file> <search> <with>");
+            cmdCompletionReplace(rest);
+            break;
+          case "set-param":
+            if (rest.length < 3) fail("Usage: dify-dsl-cli completion set-param <file> <name> <value>");
+            cmdCompletionSetParam(rest);
+            break;
+          case "remove-param":
+            if (rest.length < 2) fail("Usage: dify-dsl-cli completion remove-param <file> <name>");
+            cmdCompletionRemoveParam(rest);
+            break;
+          case "set-model":
+            if (rest.length < 3) fail("Usage: dify-dsl-cli completion set-model <file> <provider> <name> [mode]");
+            cmdCompletionSetModel(rest);
+            break;
+          case "set-max-tokens":
+            if (rest.length < 2) fail("Usage: dify-dsl-cli completion set-max-tokens <file> <number>");
+            cmdCompletionSetMaxTokens(rest);
+            break;
+          case "set-temperature":
+            if (rest.length < 2) fail("Usage: dify-dsl-cli completion set-temperature <file> <number>");
+            cmdCompletionSetTemperature(rest);
+            break;
+          case "add-input":
+            if (rest.length < 3) fail("Usage: dify-dsl-cli completion add-input <file> <variable> <label> [required]");
+            cmdCompletionAddInput(rest);
+            break;
+          case "remove-input":
+            if (rest.length < 2) fail("Usage: dify-dsl-cli completion remove-input <file> <variable>");
+            cmdCompletionRemoveInput(rest);
+            break;
+          case "set-label":
+            if (rest.length < 3) fail("Usage: dify-dsl-cli completion set-label <file> <variable> <label>");
+            cmdCompletionSetLabel(rest);
+            break;
+          default:
+            fail(`Unknown completion subcommand: ${sub}`);
+        }
+      }
       break;
     default:
       fail(`Unknown command: ${cmd}\nUse --help for usage.`);

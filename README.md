@@ -71,6 +71,32 @@ dify-dsl-cli edge add          <file> <src> <tgt> [handle]
 dify-dsl-cli edge remove       <file> <src> <tgt> [handle]
 ```
 
+### Completion App Commands
+
+支持无 `workflow`/graph 的 completion 应用（顶层为 `model_config`）。`info`、`find`、`diff`、`roundtrip`、`validate` 均兼容两种模式。
+
+```
+dify-dsl-cli completion show             <file>                # pre_prompt、model、input form
+dify-dsl-cli completion set-prompt       <file> <text|@file>   # 整体替换 pre_prompt
+dify-dsl-cli completion replace          <file> <search> <with> # pre_prompt 子串/正则替换
+dify-dsl-cli completion set-param        <file> <name> <value> # model.completion_params.<name>（自动类型解析）
+dify-dsl-cli completion remove-param     <file> <name>
+dify-dsl-cli completion set-model        <file> <provider> <name> [mode]
+dify-dsl-cli completion set-max-tokens   <file> <number>
+dify-dsl-cli completion set-temperature  <file> <number>
+dify-dsl-cli completion add-input        <file> <variable> <label> [required]
+dify-dsl-cli completion remove-input     <file> <variable>
+dify-dsl-cli completion set-label        <file> <variable> <label>
+```
+
+`set-prompt` 支持 `@file` 语法从文件读取 prompt 文本（适合超长 prompt，避免 shell 转义问题）：
+
+```bash
+dify-dsl-cli completion set-prompt app.yml @prompt.txt
+dify-dsl-cli completion set-max-tokens app.yml 2048
+dify-dsl-cli completion set-temperature app.yml 0.6
+```
+
 ### Examples
 
 ```bash

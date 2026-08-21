@@ -3,7 +3,7 @@ import * as yaml from "js-yaml";
 import { BaseNode } from "../nodes/base";
 import { NODE_TYPE_MAP, IterationStartNode } from "../nodes/index";
 import { NodeIndex } from "./NodeIndex";
-import { DifyDSLJSON, AppMeta, Dependency, Viewport, EdgeData } from "./types";
+import { DifyDSLJSON, AppMeta, Dependency, Viewport, EdgeData, CompletionAppConfig, CompletionModelConfig, CompletionInputFormItem } from "./types";
 import { ValidationReport, createReport } from "../types/validation";
 import {
   checkStartNode,
@@ -14,6 +14,7 @@ import {
   checkConvVars,
   checkLLMFields,
   checkIfElseVars,
+  checkCompletionConfig,
 } from "../validators";
 
 /**
@@ -39,6 +40,9 @@ export class DifyDSL {
 
   index: NodeIndex;
 
+  /** completion 应用（无 workflow）的原始 model_config；workflow 应用为 null */
+  completionConfig: CompletionAppConfig | null;
+
   private constructor(
     version: string,
     app: AppMeta,
@@ -49,6 +53,7 @@ export class DifyDSL {
     features: Record<string, unknown>,
     viewport: Viewport,
     index: NodeIndex,
+    completionConfig: CompletionAppConfig | null = null,
   ) {
     this.version = version;
     this.app = app;
@@ -59,6 +64,12 @@ export class DifyDSL {
     this.features = features;
     this.viewport = viewport;
     this.index = index;
+    this.completionConfig = completionConfig;
+  }
+
+  /** 是否 completion 应用（无 graph，顶层是 model_config） */
+  get isCompletion(): boolean {
+    return this.completionConfig !== null;
   }
 
   // ─────── ① parse ───────
@@ -69,6 +80,24 @@ export class DifyDSL {
    */
   static parse(yamlStr: string): DifyDSL {
     const raw = yaml.load(yamlStr) as any;
+
+    // ── completion 应用：顶层是 model_config，无 workflow/graph ──
+    if (raw.model_config && !raw.workflow) {
+      const index = new NodeIndex(); // 空索引
+      return new DifyDSL(
+        raw.version,
+        raw.app,
+        raw.dependencies ?? [],
+        [],
+        [],
+        [],
+        {},
+        { x: 0, y: 0, zoom: 0.7 },
+        index,
+        raw.model_config as CompletionAppConfig,
+      );
+    }
+
     const workflow = raw.workflow;
 
     // Build typed nodes from raw
@@ -128,6 +157,93 @@ export class DifyDSL {
   /** Get predecessor node IDs (upstream) */
   getPrevIds(id: string): string[] {
     return this.index.getPrevIds(id);
+  }
+
+  // ─── Completion app 专属方法（无 graph）───
+
+  /** completion 应用：获取 pre_prompt */
+  getPrePrompt(): string | null {
+    return this.completionConfig?.pre_prompt ?? null;
+  }
+
+  /** completion 应用：设置 pre_prompt */
+  setPrePrompt(text: string): void {
+    if (!this.completionConfig) throw new Error("Not a completion app");
+    this.completionConfig.pre_prompt = text;
+  }
+
+  /** completion 应用：替换 pre_prompt 中的文本（精确/正则均支持） */
+  replacePrePrompt(search: string | RegExp, replacement: string): number {
+    if (!this.completionConfig) throw new Error("Not a completion app");
+    const next = this.completionConfig.pre_prompt.replace(search, replacement);
+    const count = this.completionConfig.pre_prompt !== next ? 1 : 0;
+    this.completionConfig.pre_prompt = next;
+    return count;
+  }
+
+  /** completion 应用：获取 model 配置 */
+  getCompletionModel(): CompletionModelConfig | null {
+    return this.completionConfig?.model ?? null;
+  }
+
+  /** completion 应用：设置 model.completion_params 中的任意参数 */
+  setCompletionParam(name: string, value: unknown): void {
+    if (!this.completionConfig) throw new Error("Not a completion app");
+    this.completionConfig.model.completion_params[name] = value;
+  }
+
+  /** completion 应用：删除 model.completion_params 中的参数 */
+  removeCompletionParam(name: string): void {
+    if (!this.completionConfig) throw new Error("Not a completion app");
+    delete this.completionConfig.model.completion_params[name];
+  }
+
+  /** completion 应用：获取 user_input_form（输入变量列表） */
+  getInputForm(): CompletionInputFormItem[] {
+    return this.completionConfig?.user_input_form ?? [];
+  }
+
+  /** completion 应用：获取单个输入变量（返回 text-input 条目内容） */
+  getInputVariable(variable: string): Record<string, unknown> | undefined {
+    const form = this.getInputForm();
+    for (const item of form) {
+      const entry = item["text-input"] as Record<string, unknown> | undefined;
+      if (entry && entry.variable === variable) return entry;
+    }
+    return undefined;
+  }
+
+  /** completion 应用：追加输入变量（text-input） */
+  addInputVariable(variable: string, label: string, required = true): void {
+    if (!this.completionConfig) throw new Error("Not a completion app");
+    if (!this.completionConfig.user_input_form) this.completionConfig.user_input_form = [];
+    this.completionConfig.user_input_form.push({
+      "text-input": {
+        default: "",
+        hide: false,
+        label,
+        required,
+        variable,
+      },
+    });
+  }
+
+  /** completion 应用：删除输入变量 */
+  removeInputVariable(variable: string): boolean {
+    if (!this.completionConfig?.user_input_form) return false;
+    const before = this.completionConfig.user_input_form.length;
+    this.completionConfig.user_input_form = this.completionConfig.user_input_form.filter(
+      (item) => (item["text-input"] as Record<string, unknown> | undefined)?.variable !== variable,
+    );
+    return this.completionConfig.user_input_form.length < before;
+  }
+
+  /** completion 应用：替换输入变量的标签 */
+  setInputLabel(variable: string, label: string): boolean {
+    const item = this.getInputVariable(variable);
+    if (!item) return false;
+    item.label = label;
+    return true;
   }
 
   /** Get successor node IDs (downstream) */
@@ -228,6 +344,17 @@ export class DifyDSL {
   // ─────── ⑥ toJSON ───────
 
   toJSON(): DifyDSLJSON {
+    // ── completion 应用：原样输出 model_config，无 workflow ──
+    if (this.completionConfig) {
+      return {
+        version: this.version,
+        kind: "app",
+        app: { ...this.app },
+        dependencies: [...this.dependencies],
+        model_config: structuredClone(this.completionConfig),
+      };
+    }
+
     const nodeJSONs: Record<string, unknown>[] = [];
     const edgeJSONs: Record<string, unknown>[] = [];
 
@@ -275,6 +402,12 @@ export class DifyDSL {
 
   validate(): ValidationReport {
     const report = createReport();
+
+    // completion 应用：无图结构，走 model_config 校验
+    if (this.isCompletion) {
+      checkCompletionConfig(report, this.completionConfig!, this.app);
+      return report;
+    }
 
     checkStartNode(report, this.findByType("start"));
     checkAnswerNode(report, this.findByType("answer"), this.app.mode);

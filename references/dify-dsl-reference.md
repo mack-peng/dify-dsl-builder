@@ -51,6 +51,56 @@ dependencies: []           # Array, optional. Plugin dependencies.
 |------|----------|-------|--------|
 | `workflow` | Batch processing, one-shot | Start → ... → **End** | Structured outputs via End node |
 | `advanced-chat` | Conversational chatbot | Start → ... → **Answer** | Streamed text via Answer node |
+| `completion` | Single-prompt completion app（无 graph） | 无 nodes/edges | 顶层 `model_config`，直接输出 pre_prompt 结果 |
+
+### Completion App（无 workflow）
+
+`completion` 模式应用**没有** `workflow`/graph，顶层是 `model_config`：
+
+```yaml
+version: "0.7.0"
+kind: app
+app:
+  name: "提示词生成器"
+  mode: completion            # completion 模式
+  icon: grinning
+  icon_background: "#FFEAD5"
+  icon_type: emoji            # completion 应用通常有 icon_type
+  use_icon_as_answer_icon: false
+dependencies:
+  - type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: "langgenius/deepseek:..."
+model_config:
+  agent_mode: { enabled: false }
+  model:
+    provider: langgenius/deepseek/deepseek
+    name: deepseek-v4-flash
+    mode: chat                 # chat | completion
+    completion_params:
+      temperature: 0.6
+      max_tokens: 2048
+      response_format: text    # text | json_object
+      thinking: true
+  pre_prompt: "你是一个...{{user_input}}..."   # 变量用 {{var}} 双花括号
+  prompt_type: simple
+  user_input_form:
+    - text-input:
+        variable: user_input
+        label: "用户输入"
+        required: true
+        default: ""
+        hide: false
+  # 其余可选字段：file_upload、opening_statement、suggested_questions 等
+```
+
+**与 workflow 的区别：**
+- 无 `workflow.graph.nodes/edges`，无 Start/Answer/End 节点
+- pre_prompt 中变量引用用 `{{var}}`（非 `{{#node_id.var#}}`）
+- 输入变量在 `model_config.user_input_form`（非 Start 节点 variables）
+- 校验、CLI 命令与 workflow 不同（见下方注意事项）
+
+**生成工具支持**：`dify-dsl-builder` 的 `DifyDSL.parse()` 自动识别 completion 应用（`model_config && !workflow`），CLI 提供 `completion` 子命令（`completion set-prompt` / `set-param` / `add-input` 等）以及 `checkCompletionConfig` 校验。
 
 ### Features Block (Minimal)
 

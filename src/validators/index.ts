@@ -6,3 +6,4 @@ export { checkEnvVars } from "./check-env-vars";
 export { checkConvVars } from "./check-conv-vars";
 export { checkLLMFields } from "./check-llm-fields";
 export { checkIfElseVars } from "./check-if-else-vars";
+export { checkCompletionConfig } from "./check-completion-config";

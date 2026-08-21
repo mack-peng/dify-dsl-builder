@@ -10,6 +10,8 @@ abort "Usage: ruby validate-dsl.rb <file.yml>" unless ARGV[0]
 data = YAML.load_file(ARGV[0])
 app = data['app'] || {}
 mode = app['mode'] || ''
+is_completion = data.key?('model_config') && !data.key?('workflow')
+model_config = data['model_config'] || {}
 nodes = data.dig('workflow', 'graph', 'nodes') || []
 edges = data.dig('workflow', 'graph', 'edges') || []
 features = data.dig('workflow', 'features') || {}
@@ -22,6 +24,54 @@ def valid_ref?(ref_id, node_map)
 end
 
 errors = []
+
+# ═══════════════════════════════════════════
+# 0. COMPLETION 应用（无 workflow，顶层 model_config）
+# ═══════════════════════════════════════════
+
+if is_completion
+  errors << "version 缺失" unless data['version']
+  errors << "kind 缺失" unless data['kind'] == 'app'
+  errors << "app.mode 缺失" unless %w[completion].include?(mode)
+  errors << "app.name 缺失" unless app['name']
+
+  # pre_prompt
+  pre = model_config['pre_prompt']
+  errors << "model_config.pre_prompt 缺失" if pre.nil? || pre.to_s.empty?
+
+  # model
+  model = model_config['model'] || {}
+  errors << "model_config.model 缺失" unless model_config['model']
+  errors << "model.provider 缺失" if model['provider'].to_s.empty?
+  errors << "model.name 缺失" if model['name'].to_s.empty?
+  unless %w[chat completion].include?(model['mode'])
+    errors << "model.mode '#{model['mode']}' 不合法，应为 chat/completion"
+  end
+  errors << "model.completion_params 缺失" unless model['completion_params'].is_a?(Hash)
+
+  # user_input_form 结构
+  (model_config['user_input_form'] || []).each_with_index do |item, i|
+    entry = item['text-input']
+    unless entry.is_a?(Hash)
+      errors << "user_input_form[#{i}] 不是 text-input 结构"
+      next
+    end
+    errors << "user_input_form[#{i}].variable 缺失" if entry['variable'].to_s.empty?
+    errors << "user_input_form[#{i}].label 缺失" if entry['label'].to_s.empty?
+  end
+
+  puts "════════════════════════════════════════"
+  puts "  Dify DSL 校验: #{ARGV[0]}"
+  puts "  mode: #{mode} (completion, #{model_config['user_input_form']&.size || 0} inputs, #{pre.to_s.length} chars prompt)"
+  puts "════════════════════════════════════════"
+  if errors.empty?
+    puts "  ✅ 全部通过（CRITICAL 级别）"
+  else
+    errors.each { |e| puts "  ❌ #{e}" }
+    puts "\n  #{errors.size} errors"
+  end
+  exit errors.empty? ? 0 : 1
+end
 
 # ═══════════════════════════════════════════
 # 1. TOP-LEVEL

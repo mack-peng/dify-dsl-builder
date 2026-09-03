@@ -18,14 +18,14 @@ npx dify-dsl-cli <command> ...
 
 ### For LLM Agents
 
-When working in this repo (clone + dev), fetch the guides:
+Fetch the guides to understand the tool:
 
 ```bash
 curl -s https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/guide/installation.md
 curl -s https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/guide/patch.md
 ```
 
-When implementing requirements, prefer the YAML Patch system ([`docs/guide/patch.md`](docs/guide/patch.md)) — writing descriptive files is preferred over writing TypeScript code directly.
+Prefer the YAML Patch system over writing TypeScript code for DSL modifications.
 
 ---
 

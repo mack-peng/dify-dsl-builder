@@ -51,21 +51,21 @@ dependencies: []           # Array, optional. Plugin dependencies.
 |------|----------|-------|--------|
 | `workflow` | Batch processing, one-shot | Start → ... → **End** | Structured outputs via End node |
 | `advanced-chat` | Conversational chatbot | Start → ... → **Answer** | Streamed text via Answer node |
-| `completion` | Single-prompt completion app（无 graph） | 无 nodes/edges | 顶层 `model_config`，直接输出 pre_prompt 结果 |
+| `completion` | Single-prompt completion app (no graph) | No nodes/edges | Top-level `model_config`, outputs pre_prompt result directly |
 
-### Completion App（无 workflow）
+### Completion App (No Workflow)
 
-`completion` 模式应用**没有** `workflow`/graph，顶层是 `model_config`：
+`completion` mode apps have **no** `workflow`/graph. The top level is `model_config`:
 
 ```yaml
 version: "0.7.0"
 kind: app
 app:
-  name: "提示词生成器"
-  mode: completion            # completion 模式
+  name: "Prompt Generator"
+  mode: completion            # completion mode
   icon: grinning
   icon_background: "#FFEAD5"
-  icon_type: emoji            # completion 应用通常有 icon_type
+  icon_type: emoji            # completion apps typically have icon_type
   use_icon_as_answer_icon: false
 dependencies:
   - type: marketplace
@@ -82,25 +82,25 @@ model_config:
       max_tokens: 2048
       response_format: text    # text | json_object
       thinking: true
-  pre_prompt: "你是一个...{{user_input}}..."   # 变量用 {{var}} 双花括号
+  pre_prompt: "You are a...{{user_input}}..."   # Variables use {{var}} double-brace syntax
   prompt_type: simple
   user_input_form:
     - text-input:
         variable: user_input
-        label: "用户输入"
+        label: "User Input"
         required: true
         default: ""
         hide: false
-  # 其余可选字段：file_upload、opening_statement、suggested_questions 等
+  # Other optional fields: file_upload, opening_statement, suggested_questions, etc.
 ```
 
-**与 workflow 的区别：**
-- 无 `workflow.graph.nodes/edges`，无 Start/Answer/End 节点
-- pre_prompt 中变量引用用 `{{var}}`（非 `{{#node_id.var#}}`）
-- 输入变量在 `model_config.user_input_form`（非 Start 节点 variables）
-- 校验、CLI 命令与 workflow 不同（见下方注意事项）
+**Differences from workflow:**
+- No `workflow.graph.nodes/edges`, no Start/Answer/End nodes
+- Variable references in pre_prompt use `{{var}}` (not `{{#node_id.var#}}`)
+- Input variables are in `model_config.user_input_form` (not Start node variables)
+- Validation and CLI commands differ from workflow (see notes below)
 
-**生成工具支持**：`dify-dsl-builder` 的 `DifyDSL.parse()` 自动识别 completion 应用（`model_config && !workflow`），CLI 提供 `completion` 子命令（`completion set-prompt` / `set-param` / `add-input` 等）以及 `checkCompletionConfig` 校验。
+**Tool support**: `dify-dsl-builder`'s `DifyDSL.parse()` automatically detects completion apps (`model_config && !workflow`). The CLI provides `completion` subcommands (`completion set-prompt` / `set-param` / `add-input`, etc.) and `checkCompletionConfig` validation.
 
 ### Features Block (Minimal)
 
@@ -767,9 +767,9 @@ Start (query input)
 
 ```
 Start (source_text, source_lang, target_lang, country)
-  → LLM (直译)
+  → LLM (direct translation)
     → IF/ELSE (quality check)
-      ├→ true → LLM (意译)
+      ├→ true → LLM (idiomatic translation)
       └→ false → Variable Aggregator
         → LLM (final polish)
           → End
@@ -1201,15 +1201,15 @@ The companion Code node that formats Baidu search results. Variable name MUST be
 
 ```yaml
 - data:
-    code: "function main({ searchJson }) {\n    const references = searchJson[0].references;\n    let combinedText = \"\";\n    references.forEach((ref, index) => {\n        combinedText += `【参考资料 ${index + 1}】\\n`;\n        combinedText += `标题: ${ref.title}\\n`;\n        combinedText += `内容: ${ref.content}\\n\\n`;\n    });\n    return { result: combinedText };\n}"
+    code: "function main({ searchJson }) {\n    const references = searchJson[0].references;\n    let combinedText = \"\";\n    references.forEach((ref, index) => {\n        combinedText += `Reference ${index + 1}\n`;\n        combinedText += `Title: ${ref.title}\\n`;\n        combinedText += `Content: ${ref.content}\\n\\n`;\n    });\n    return { result: combinedText };\n}"
     code_language: javascript
-    desc: 格式化百度搜索结果
+    desc: Format Baidu search results
     outputs:
       result:
         children: null
         type: string
     selected: false
-    title: 格式化搜索结果
+    title: Format Search Results
     type: code
     variables:
     - value_selector:
@@ -1232,7 +1232,7 @@ When adding web search alongside Knowledge Retrieval, the search Code node outpu
 def main(raw_results: list, search_text: str) -> dict:
     # ... KB dedup logic produces kb_text ...
     if search_text:
-        kb_text += "\n\n## 网络搜索结果\n" + search_text
+        kb_text += "\n\n## Web Search Results\n" + search_text
     return {"count": len(deduped), "text": kb_text}
 ```
 

@@ -38,41 +38,41 @@ Your process:
 2. Read requirements → analyze each item
 3. Create a technical plan → decide per-item approach
 4. Choose execution path:
-   ├── completion 应用（无 graph，顶层 model_config）→ 用 completion 子命令
+   ├── Completion app (no graph, top-level model_config) → use completion subcommands
    ├── Simple change (title/desc/remove) → use atomic commands
    └── Complex change (multi-step/structural) → write YAML patch file
 5. Confirm plan with user, then execute
 ```
 
-**判断应用类型**：先跑 `dify-dsl-cli info <file>`。`Mode: completion` 且 `Nodes: 0` 表示 completion 应用（顶层是 `model_config`，无 workflow/graph），用 `completion` 子命令；否则用 node/edge/patch 命令。
+**Determine app type**: run `dify-dsl-cli info <file>` first. `Mode: completion` with `Nodes: 0` indicates a completion app (top-level `model_config`, no workflow/graph) — use `completion` subcommands; otherwise use node/edge/patch commands.
 
 ### 1.2.1 Completion Apps
 
-completion 应用没有 graph/节点，核心字段是顶层 `model_config.pre_prompt`、`model_config.model`、`model_config.user_input_form`。用专属子命令修改：
+Completion apps have no graph/nodes. The core fields are top-level `model_config.pre_prompt`, `model_config.model`, and `model_config.user_input_form`. Use dedicated subcommands to modify them:
 
 ```bash
-# 查看 pre_prompt / model / input form
+# View pre_prompt / model / input form
 npx dify-dsl-cli completion show app.yml
 
-# 整体替换 pre_prompt（@file 从文件读，避免 shell 转义）
+# Replace entire pre_prompt (@file reads from file, avoids shell escaping)
 npx dify-dsl-cli completion set-prompt app.yml @prompt.txt
 
-# pre_prompt 子串/正则替换
-npx dify-dsl-cli completion replace app.yml "旧文本" "新文本"
+# Substring/regex replace in pre_prompt
+npx dify-dsl-cli completion replace app.yml "old text" "new text"
 
-# 修改模型参数
+# Modify model parameters
 npx dify-dsl-cli completion set-max-tokens app.yml 2048
 npx dify-dsl-cli completion set-temperature app.yml 0.6
 npx dify-dsl-cli completion set-param app.yml response_format json_object
 npx dify-dsl-cli completion set-model app.yml langgenius/deepseek/deepseek deepseek-v4-flash chat
 
-# 修改输入变量
-npx dify-dsl-cli completion add-input app.yml user_input "用户输入" true
+# Modify input variables
+npx dify-dsl-cli completion add-input app.yml user_input "User Input" true
 npx dify-dsl-cli completion remove-input app.yml old_var
-npx dify-dsl-cli completion set-label app.yml user_input "用户输入"
+npx dify-dsl-cli completion set-label app.yml user_input "User Input"
 ```
 
-`info`、`find`、`diff`、`roundtrip`、`validate` 均自动兼容两种模式。
+`info`, `find`, `diff`, `roundtrip`, `validate` are all automatically compatible with both modes.
 
 ### 1.3 Simple Changes: Atomic Commands
 
@@ -193,10 +193,10 @@ Atomic commands (modify file in place):
   edge add         <file> <src> <tgt> [handle]
   edge remove      <file> <src> <tgt> [handle]
 
-Completion app commands (无 graph，顶层 model_config):
-  completion show             <file>                # pre_prompt、model、input form
-  completion set-prompt       <file> <text|@file>   # 整体替换 pre_prompt
-  completion replace          <file> <search> <with> # pre_prompt 子串/正则替换
+Completion app commands (no graph, top-level model_config):
+  completion show             <file>                # View pre_prompt, model, input form
+  completion set-prompt       <file> <text|@file>   # Replace entire pre_prompt
+  completion replace          <file> <search> <with> # Substring/regex replace in pre_prompt
   completion set-param        <file> <name> <value> # model.completion_params.<name>
   completion remove-param     <file> <name>
   completion set-model        <file> <provider> <name> [mode]
@@ -273,35 +273,35 @@ const report = dsl.validate();
 
 Validation checks: Start node exists, Answer node exists (advanced-chat), edge node refs, code output types, env/conv variable schema completeness (`id` + `selector` + value-type match), LLM `context`/`vision` required fields, if-else condition variable selectors must not reference env/conversation variables.
 
-completion 应用走 `checkCompletionConfig`：校验 `pre_prompt` 非空、`model.provider/name/mode/completion_params` 完整、`user_input_form` 每项含 `variable`/`label`。
+Completion apps use `checkCompletionConfig`: validates `pre_prompt` is non-empty, `model.provider/name/mode/completion_params` are complete, and each `user_input_form` entry contains `variable`/`label`.
 
 ### 4.3.1 Completion App API
 
-`DifyDSL` 自动识别 completion 应用（`parse()` 检测 `model_config && !workflow`），用 `dsl.isCompletion` 区分：
+`DifyDSL` automatically detects completion apps (`parse()` checks `model_config && !workflow`), distinguish with `dsl.isCompletion`:
 
 ```ts
 const dsl = DifyDSL.parse(yamlStr);
 if (dsl.isCompletion) {
-  // 获取 / 设置 pre_prompt
+  // Get / set pre_prompt
   const prompt = dsl.getPrePrompt();            // string | null
-  dsl.setPrePrompt("新的提示词文本");
+  dsl.setPrePrompt("New prompt text");
 
-  // 子串 / 正则替换（返回替换次数）
-  dsl.replacePrePrompt("旧文本", "新文本");
-  dsl.replacePrePrompt(/旧\d+/g, "新");
+  // Substring / regex replace (returns replacement count)
+  dsl.replacePrePrompt("old text", "new text");
+  dsl.replacePrePrompt(/old\d+/g, "new");
 
-  // 模型配置
+  // Model config
   const model = dsl.getCompletionModel();       // CompletionModelConfig | null
-  dsl.setCompletionParam("max_tokens", 2048);   // 自动推断（number/boolean/JSON）
+  dsl.setCompletionParam("max_tokens", 2048);   // Auto-inferred (number/boolean/JSON)
   dsl.setCompletionParam("temperature", 0.6);
   dsl.removeCompletionParam("top_p");
 
-  // 输入变量（user_input_form）
+  // Input variables (user_input_form)
   const form = dsl.getInputForm();              // CompletionInputFormItem[]
-  const item = dsl.getInputVariable("user_input"); // text-input 条目 | undefined
-  dsl.addInputVariable("user_input", "用户输入", true);
+  const item = dsl.getInputVariable("user_input"); // text-input entry | undefined
+  dsl.addInputVariable("user_input", "User Input", true);
   dsl.removeInputVariable("old_var");           // boolean
-  dsl.setInputLabel("user_input", "新的标签");   // boolean
+  dsl.setInputLabel("user_input", "New Label");   // boolean
 }
 ```
 
@@ -312,10 +312,10 @@ if (dsl.isCompletion) {
 | `dsl.version` | `string` | DSL version |
 | `dsl.app` | `AppMeta` | App metadata (name/mode/description/icon) |
 | `dsl.mode` | `string` | `workflow` \| `advanced-chat` \| `completion` |
-| `dsl.isCompletion` | `boolean` | `true` 表示 completion 应用（无 graph） |
-| `dsl.completionConfig` | `CompletionAppConfig \| null` | completion 应用的原始 model_config |
-| `dsl.nodeCount` | `number` | Total node count (completion 恒为 0) |
-| `dsl.edgeCount` | `number` | Total edge count (completion 恒为 0) |
+| `dsl.isCompletion` | `boolean` | `true` indicates a completion app (no graph) |
+| `dsl.completionConfig` | `CompletionAppConfig \| null` | Raw model_config for completion apps |
+| `dsl.nodeCount` | `number` | Total node count (always 0 for completion) |
+| `dsl.edgeCount` | `number` | Total edge count (always 0 for completion) |
 | `dsl.dependencies` | `Dependency[]` | Plugin dependencies |
 | `dsl.envVariables` | `unknown[]` | Environment variables |
 | `dsl.convVariables` | `unknown[]` | Conversation variables (advanced-chat) |
@@ -679,10 +679,10 @@ interface AppMeta {
   icon: string;
   icon_background: string;
   use_icon_as_answer_icon: boolean;
-  icon_type?: string;   // completion 应用为 "emoji"
+  icon_type?: string;   // "emoji" for completion apps
 }
 
-// completion 应用顶层 model_config（无 workflow）
+// Completion app top-level model_config (no workflow)
 interface CompletionAppConfig {
   model: {
     provider: string;
@@ -701,7 +701,7 @@ interface CompletionAppConfig {
     };
     [key: string]: unknown;
   }[];
-  // 其余字段（agent_mode、file_upload 等）透传
+  // Remaining fields (agent_mode, file_upload, etc.) are passed through
   [key: string]: unknown;
 }
 ```

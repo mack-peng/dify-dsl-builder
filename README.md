@@ -25,7 +25,7 @@ curl -s https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/g
 curl -s https://raw.githubusercontent.com/mack-peng/dify-dsl-builder/main/docs/guide/patch.md
 ```
 
-实现需求时优先使用 YAML Patch 系统（[`docs/guide/patch.md`](docs/guide/patch.md)），编写描述文件优于直接写 TypeScript 代码。
+When implementing requirements, prefer the YAML Patch system ([`docs/guide/patch.md`](docs/guide/patch.md)) — writing descriptive files is preferred over writing TypeScript code directly.
 
 ---
 
@@ -73,13 +73,13 @@ dify-dsl-cli edge remove       <file> <src> <tgt> [handle]
 
 ### Completion App Commands
 
-支持无 `workflow`/graph 的 completion 应用（顶层为 `model_config`）。`info`、`find`、`diff`、`roundtrip`、`validate` 均兼容两种模式。
+Supports completion apps without `workflow`/graph (top-level `model_config`). `info`, `find`, `diff`, `roundtrip`, `validate` are all compatible with both modes.
 
 ```
 dify-dsl-cli completion show             <file>                # pre_prompt、model、input form
-dify-dsl-cli completion set-prompt       <file> <text|@file>   # 整体替换 pre_prompt
-dify-dsl-cli completion replace          <file> <search> <with> # pre_prompt 子串/正则替换
-dify-dsl-cli completion set-param        <file> <name> <value> # model.completion_params.<name>（自动类型解析）
+dify-dsl-cli completion set-prompt       <file> <text|@file>   # Replace entire pre_prompt
+dify-dsl-cli completion replace          <file> <search> <with> # Substring/regex replace in pre_prompt
+dify-dsl-cli completion set-param        <file> <name> <value> # model.completion_params.<name> (auto type inference)
 dify-dsl-cli completion remove-param     <file> <name>
 dify-dsl-cli completion set-model        <file> <provider> <name> [mode]
 dify-dsl-cli completion set-max-tokens   <file> <number>
@@ -89,7 +89,7 @@ dify-dsl-cli completion remove-input     <file> <variable>
 dify-dsl-cli completion set-label        <file> <variable> <label>
 ```
 
-`set-prompt` 支持 `@file` 语法从文件读取 prompt 文本（适合超长 prompt，避免 shell 转义问题）：
+`set-prompt` supports `@file` syntax to read prompt text from a file (useful for long prompts, avoids shell escaping issues):
 
 ```bash
 dify-dsl-cli completion set-prompt app.yml @prompt.txt
@@ -102,7 +102,7 @@ dify-dsl-cli completion set-temperature app.yml 0.6
 ```bash
 # Understand the workflow
 dify-dsl-cli flow app.yml
-dify-dsl-cli find app.yml "温度"           # find all mentions of a keyword
+dify-dsl-cli find app.yml "temperature"    # find all mentions of a keyword
 dify-dsl-cli node show app.yml "llm-001"   # inspect a specific LLM node
 
 # Apply a YAML patch

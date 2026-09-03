@@ -26,7 +26,7 @@ npm run web:build   # production bundle → dist-web/
 
 `tsconfig.web.json` extends `tsconfig.json` with `module: "ESNext"`, `moduleResolution: "bundler"`, `jsx: "react-jsx"`, and `lib: ["DOM"]`.
 
-The dev server hardcodes `/api/load` to read `input/高考志愿推荐助手.yml` and `/api/save` to write `output/web-output.yml`. Both paths are relative to the project root, not configurable.
+The dev server hardcodes `/api/load` to read `input/college-advisor.yml` and `/api/save` to write `output/web-output.yml`. Both paths are relative to the project root, not configurable.
 
 ## Architecture
 
@@ -84,16 +84,16 @@ Reads/manipulates/writes **Dify DSL YAML** (`app.yml` exported from Dify Studio)
 
 ## Completion app support
 
-`DifyDSL` 同时支持 **workflow/advanced-chat**（有 `graph`）与 **completion**（顶层 `model_config`，无 workflow）两类 DSL：
+`DifyDSL` supports two DSL types: **workflow/advanced-chat** (with `graph`) and **completion** (top-level `model_config`, no workflow):
 
-- `parse()` 检测 `model_config && !workflow` → 走 completion 分支，`completionConfig` 持有原始 model_config，索引为空
-- `toJSON()` 对 completion 原样输出 `model_config`（无 `workflow` 字段）
-- `isCompletion` getter 区分模式；completion 专属方法：`getPrePrompt` / `setPrePrompt` / `replacePrePrompt` / `getCompletionModel` / `setCompletionParam` / `getInputForm` / `addInputVariable` / `removeInputVariable` / `setInputLabel`
-- `validate()` 对 completion 走 `checkCompletionConfig`（校验 pre_prompt / model / user_input_form），不跑图校验
-- CLI 提供 `completion show|set-prompt|replace|set-param|remove-param|set-model|set-max-tokens|set-temperature|add-input|remove-input|set-label` 子命令；`info`/`find`/`diff`/`roundtrip`/`validate` 自动兼容两种模式
-- `scripts/validate-dsl.rb` 对 completion 跳过所有图检查，改为校验 model_config
+- `parse()` detects `model_config && !workflow` → takes the completion branch; `completionConfig` holds the raw model_config, index is empty
+- `toJSON()` outputs `model_config` as-is for completion (no `workflow` field)
+- `isCompletion` getter distinguishes modes; completion-specific methods: `getPrePrompt` / `setPrePrompt` / `replacePrePrompt` / `getCompletionModel` / `setCompletionParam` / `getInputForm` / `addInputVariable` / `removeInputVariable` / `setInputLabel`
+- `validate()` uses `checkCompletionConfig` for completion (validates pre_prompt / model / user_input_form), skips graph validation
+- CLI provides `completion show|set-prompt|replace|set-param|remove-param|set-model|set-max-tokens|set-temperature|add-input|remove-input|set-label` subcommands; `info`/`find`/`diff`/`roundtrip`/`validate` are automatically compatible with both modes
+- `scripts/validate-dsl.rb` skips all graph checks for completion, validates model_config instead
 
-新增 completion 能力时注意：`CompletionInputFormItem["text-input"]` 是嵌套结构（variable/label 在 text-input 内部），`getInputVariable` 返回内层条目。
+When adding completion support: `CompletionInputFormItem["text-input"]` is a nested structure (variable/label inside text-input); `getInputVariable` returns the inner entry.
 
 ## References
 

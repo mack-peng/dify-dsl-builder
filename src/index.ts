@@ -7,6 +7,7 @@ export { DifyDSL } from "./core/DifyDSL";
 export { BaseNode } from "./nodes/base";
 export { EdgeData, DifyDSLJSON, AppMeta, Dependency, Viewport, CompletionAppConfig, CompletionModelConfig, CompletionInputFormItem } from "./core/types";
 export { Diagnostic, ValidationReport } from "./types/validation";
+export { loadPatch, applyPatch } from "./patch";
 
 // Node types
 export {
